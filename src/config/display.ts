@@ -35,12 +35,16 @@ export const COLORS = {
   GOLD: 0xc9a55c,
   FRAME: 0x2a2a2a,
   HIGHLIGHT: 0xc9a55c,
+  HP_GREEN: 0x4caf50,
+  HP_YELLOW: 0xd4a72c,
+  HP_RED: 0xc0392b,
 } as const;
 
 export const TILE_COLORS = {
   FLOOR_LIGHT: 0x3a3a3a,
-  FLOOR_DARK: 0x2e2e2e,
+  FLOOR_DARK: 0x343434,
   WALL: 0x1a1a1a,
+  WALL_EDGE: 0x262626,
 } as const;
 
 export const TEXT_COLORS = {

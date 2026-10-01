@@ -99,10 +99,11 @@ O core recebe `Action` (`src/core/actions.ts`), nunca tecla. `InputController` t
 
 | Ação | Teclado | Controle |
 |---|---|---|
-| Mover | WASD / Setas | D-pad / analógico esquerdo |
+| Mover / atacar (bump) | WASD / Setas | D-pad / analógico esquerdo |
+| Passar o turno | Espaço | X |
 | Skills 1–8 | 1–8 | **a decidir no Marco 3** (ex.: LB/RB + botões) |
 | Inventário | I | Y |
-| Confirmar | Enter / Espaço | A |
+| Confirmar (e nova run no fim) | Enter | A |
 | Cancelar | Esc | B |
 
 Repetição de movimento: 130 ms (constantes no `InputController`). **Toque na tela fica pós-MVP.**
@@ -142,9 +143,14 @@ cryptveil/
     │   ├── grid.ts            # Point, Direction, step, manhattan, neighbors4
     │   ├── rng.ts             # Rng com seed
     │   ├── combat/damage.ts   # Fórmula de dano
-    │   ├── (M1) dungeon/      # TileType, DungeonMap — (M2) DungeonGenerator BSP, Room
-    │   ├── (M1) entities/     # Entity, Player, Enemy, ai/ (estratégias injetadas)
-    │   ├── (M1) turn/         # TurnManager + eventos do core
+    │   ├── events.ts          # CoreEvent (moved, attacked, died, waited, victory, defeat)
+    │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
+    │   ├── run.ts             # RunState serializável + createTestRun + consultas
+    │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
+    │   ├── data/entities.ts   # Modelos (knight, goblinDummy) com satisfies
+    │   ├── dungeon/           # DungeonMap + TileType — (M2) DungeonGenerator BSP, Room
+    │   ├── entities/Entity.ts # Entidade como dado puro
+    │   ├── turn/TurnManager.ts# resolvePlayerAction → TurnResult + eventos
     │   ├── (M2) items/        # Item, Inventory, LootTable
     │   ├── (M2) run/          # RunState serializável + save da run
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
@@ -164,10 +170,11 @@ Princípio mantido: **vertical slice primeiro**; cada marco termina jogável e t
 Stack nova, core/view, escala inteira, câmera do mapa + UIScene, `InputController` (teclado + controle), `Rng`, fórmula de dano, 25 testes (incluindo a guarda de arquitetura). Tela: título, seed, grid 15×11 em xadrez, cantos marcados, clique mostra o tile, quadrado vermelho anda com WASD/D-pad, painel LOG mostra as últimas ações.
 **Validação:** `npm install && npm run dev` → `localhost:3000`.
 
-### Marco 1 — Vertical slice (coração do jogo)
-Core: `DungeonMap` (sala fixa: borda WALL, interior FLOOR), `Entity`/`Player`/`Enemy` como dados, `TurnManager`, IA BFS como estratégia injetada, bump attack com `rollDamage`, eventos do core.
-View: Knight (quadrado vermelho "K", HP 50 / ATK 10 / DEF 5), Goblin dummy (verde "G", HP 15 / ATK 3 / DEF 1), barras de HP, flash no hit, fade na morte, overlay "YOU DIED" / "VICTORY", entrada vinda do `InputController`.
-Testes: combate, BFS, regra da parede.
+### ✅ Marco 1 — Vertical slice (entregue em 01/10/2026)
+Core: `DungeonMap` (sala fixa 15×11), `Entity` como dado, `TurnManager` (`resolvePlayerAction` muta o `RunState` e devolve eventos), IA `chase` por BFS injetada por id, bump attack com `rollDamage`. 58 testes, incluindo luta inteira determinística por seed e save/restore no meio da luta.
+View: `EntityView` (quadrado + letra + barra de HP, flash no golpe, fade na morte, tremidinha em golpe ≥ 8), LOG de combate em português (`view/format.ts`), painel do Knight, overlay VICTORY / YOU DIED.
+Decisões tomadas: **passar o turno** (Espaço / X); **Enter / A no fim começa run nova** com seed novo; **jogador sempre age primeiro**, depois os inimigos na ordem da lista.
+Observação: o Goblin dummy (ATK 3) contra DEF 5 sempre dá 1 de dano — é o risco da §2.12 aparecendo cedo. Os monstros reais do Marco 4 precisam de ATK acima da DEF esperada do Knight em cada andar.
 
 ### Marco 2 — Loop de run
 BSP real, corredores, STAIRS, transição de andar, câmera seguindo, `RunState` serializável + **suspender automático**, Item/Inventory/LootTable, Knight completo (4 skills, mana, passiva +2 HP por kill), XP/level, Training Room.
@@ -202,7 +209,7 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 ## 7. Pendências e decisões em aberto
 
 - [ ] Adicionar `docs/GAME_BRIEFING.md` (antes do Marco 2).
-- [ ] **"Passar o turno"** (esperar parado): não existe no handoff. Comum em roguelike; decidir no Marco 1.
+- [x] Passar o turno: Espaço / X (Marco 1).
 - [ ] **"Sala explorada"** na Training Room: entrou na sala? Limpou os monstros? Decidir no Marco 2.
 - [ ] Mapeamento das skills no controle (Marco 3).
 - [ ] Empilhamento de DEF (§2.12) — vigiar no Marco 4.

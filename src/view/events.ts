@@ -1,7 +1,6 @@
 import type Phaser from 'phaser';
-import type { Action } from '../core/actions';
 import type { Point } from '../core/grid';
-import type { InputSource } from '../input/InputController';
+import type { RunStatus } from '../core/run';
 
 /**
  * Eventos entre GameScene (mundo) e UIScene (HUD), tipados.
@@ -11,7 +10,10 @@ import type { InputSource } from '../input/InputController';
 export interface GameEvents {
   'run-started': { seed: number };
   'tile-clicked': { tile: Point };
-  'action': { action: Action; source: InputSource };
+  /** Linhas novas pro LOG de combate. */
+  'log': { lines: string[] };
+  'player-status': { hp: number; maxHp: number; atk: number; def: number; turn: number };
+  'run-ended': { result: Exclude<RunStatus, 'playing'>; turns: number };
 }
 
 export type GameEventName = keyof GameEvents;

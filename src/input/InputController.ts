@@ -22,8 +22,9 @@ type KeyMap = Record<string, Phaser.Input.Keyboard.Key>;
  * Botões: só na borda de descida (um aperto = uma ação).
  *
  * Mapeamento atual:
- *   Teclado  — WASD/Setas: mover · 1–8: skills · I: inventário · Enter/Espaço: confirmar · Esc: cancelar
- *   Controle — D-pad/analógico: mover · A: confirmar · B: cancelar · Y: inventário
+ *   Teclado  — WASD/Setas: mover/atacar · Espaço: passar turno · 1–8: skills · I: inventário
+ *              Enter: confirmar · Esc: cancelar
+ *   Controle — D-pad/analógico: mover/atacar · X: passar turno · A: confirmar · B: cancelar · Y: inventário
  *   (Skills no controle ficam pro Marco 2/3, quando a hotbar existir.)
  */
 export class InputController {
@@ -34,7 +35,7 @@ export class InputController {
   private heldSource: InputSource = 'keyboard';
   private nextRepeatAt = 0;
 
-  private prevPadButtons = { A: false, B: false, Y: false };
+  private prevPadButtons = { A: false, B: false, X: false, Y: false };
 
   /** Última origem usada — pra UI mostrar "A" ou "Enter" no futuro. */
   lastSource: InputSource = 'keyboard';
@@ -128,16 +129,18 @@ export class InputController {
       if (just(name)) this.emit({ type: 'skill', slot: (i + 1) as SkillSlot }, 'keyboard');
     });
     if (just('I')) this.emit({ type: 'inventory' }, 'keyboard');
-    if (just('ENTER') || just('SPACE')) this.emit({ type: 'confirm' }, 'keyboard');
+    if (just('SPACE')) this.emit({ type: 'wait' }, 'keyboard');
+    if (just('ENTER')) this.emit({ type: 'confirm' }, 'keyboard');
     if (just('ESC')) this.emit({ type: 'cancel' }, 'keyboard');
   }
 
   private updateGamepadButtons(): void {
     const pad = this.pad();
     if (!pad) return;
-    const now = { A: pad.A, B: pad.B, Y: pad.Y };
+    const now = { A: pad.A, B: pad.B, X: pad.X, Y: pad.Y };
     if (now.A && !this.prevPadButtons.A) this.emit({ type: 'confirm' }, 'gamepad');
     if (now.B && !this.prevPadButtons.B) this.emit({ type: 'cancel' }, 'gamepad');
+    if (now.X && !this.prevPadButtons.X) this.emit({ type: 'wait' }, 'gamepad');
     if (now.Y && !this.prevPadButtons.Y) this.emit({ type: 'inventory' }, 'gamepad');
     this.prevPadButtons = now;
   }

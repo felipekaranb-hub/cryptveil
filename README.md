@@ -26,4 +26,4 @@ Abre em `http://localhost:3000`. Para repetir uma run específica: `http://local
 
 ## Estado
 
-Marco 0 (setup base) entregue. Plano completo em [`docs/HANDOFF.md`](docs/HANDOFF.md).
+Marco 1 (vertical slice: Knight × Goblin) entregue. Plano completo em [`docs/HANDOFF.md`](docs/HANDOFF.md).

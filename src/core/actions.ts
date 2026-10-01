@@ -9,6 +9,7 @@ export type SkillSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type Action =
   | { readonly type: 'move'; readonly dir: Direction }
+  | { readonly type: 'wait' }
   | { readonly type: 'skill'; readonly slot: SkillSlot }
   | { readonly type: 'inventory' }
   | { readonly type: 'confirm' }
@@ -18,6 +19,8 @@ export function describeAction(a: Action): string {
   switch (a.type) {
     case 'move':
       return `move ${a.dir}`;
+    case 'wait':
+      return 'wait';
     case 'skill':
       return `skill ${a.slot}`;
     case 'inventory':

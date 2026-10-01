@@ -63,9 +63,14 @@ export function installRenderScaling(game: Phaser.Game): void {
 export function bindRenderScale(scene: Phaser.Scene, layout: (scale: number) => void): void {
   const onScale = (scale: number): void => {
     layout(scale);
-    for (const obj of scene.children.list) {
-      if (obj instanceof Phaser.GameObjects.Text) obj.setResolution(scale);
-    }
+    // Inclui textos dentro de containers (entidades, overlays)
+    const visit = (list: readonly Phaser.GameObjects.GameObject[]): void => {
+      for (const obj of list) {
+        if (obj instanceof Phaser.GameObjects.Text) obj.setResolution(scale);
+        else if (obj instanceof Phaser.GameObjects.Container) visit(obj.list);
+      }
+    };
+    visit(scene.children.list);
   };
 
   onScale(currentScale);
