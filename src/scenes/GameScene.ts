@@ -14,7 +14,7 @@ import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
-import { formatEvent, formatFailure } from '../view/format';
+import { describeCard, describeTraining, formatEvent, formatFailure, formatHotbar } from '../view/format';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 interface GameSceneData {
@@ -32,8 +32,8 @@ export class GameScene extends Phaser.Scene {
   private mode: 'playing' | 'resume-offer' = 'playing';
   private readonly views = new Map<string, EntityView>();
   private mapGraphics: Phaser.GameObjects.Graphics | null = null;
-  /** Opção destacada no prompt da Training Room (0 = +ATK, 1 = +DEF). */
-  private trainingChoice = 0;
+  /** Opção destacada na escolha aberta (carta ou Training Room). */
+  private choice = 0;
   private controls!: InputController;
   private clickMarker!: Phaser.GameObjects.Rectangle;
 
@@ -53,7 +53,7 @@ export class GameScene extends Phaser.Scene {
     this.state = suspended ?? createRun(data.seed ?? urlSeed ?? randomSeed());
     this.views.clear();
     this.mapGraphics = null;
-    this.trainingChoice = 0;
+    this.choice = 0;
   }
 
   create(): void {
@@ -202,8 +202,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.state.prompt === 'training') {
-      this.handleTrainingInput(action);
+    if (this.state.prompt) {
+      this.handleChoiceInput(action);
       return;
     }
 
@@ -219,28 +219,47 @@ export class GameScene extends Phaser.Scene {
     this.emitPlayerStatus();
   }
 
-  /** Training Room: ←/→ escolhe, Enter/A confirma. O core só recebe a escolha final. */
-  private handleTrainingInput(action: Action): void {
+  /** Escolha (carta/Training Room): ←/→ escolhe, Enter/A confirma. O core só recebe a escolha final. */
+  private handleChoiceInput(action: Action): void {
+    const count = this.choiceOptions().length;
     if (action.type === 'move' && (action.dir === 'W' || action.dir === 'E')) {
-      this.trainingChoice = action.dir === 'W' ? 0 : 1;
-      emitGameEvent(this.game.events, 'training-prompt', { selected: this.trainingChoice });
+      const delta = action.dir === 'W' ? -1 : 1;
+      this.choice = Math.min(count - 1, Math.max(0, this.choice + delta));
+      this.emitChoice();
       return;
     }
     if (action.type !== 'confirm') return;
-    const result = resolvePlayerAction(this.state, { type: 'choose', index: this.trainingChoice });
+    const result = resolvePlayerAction(this.state, { type: 'choose', index: this.choice });
     this.playEvents(result.events);
     this.emitPlayerStatus();
   }
 
-  /** Começa (ou retoma) o jogo: some o overlay e reabre um prompt pendente do save. */
+  /** Começa (ou retoma) o jogo: some o overlay e reabre uma escolha pendente do save. */
   private startPlaying(): void {
     emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
-    if (this.state.prompt === 'training') this.openTrainingPrompt();
+    if (this.state.prompt) this.openChoice();
   }
 
-  private openTrainingPrompt(): void {
-    this.trainingChoice = 0;
-    emitGameEvent(this.game.events, 'training-prompt', { selected: 0 });
+  private choiceOptions(): ReturnType<typeof describeTraining> {
+    const prompt = this.state.prompt;
+    if (!prompt) return [];
+    if (prompt.type === 'training') return describeTraining();
+    return prompt.offer.map((id) => describeCard(id, this.state.hero));
+  }
+
+  private openChoice(): void {
+    this.choice = 0;
+    this.emitChoice();
+  }
+
+  private emitChoice(): void {
+    const prompt = this.state.prompt;
+    if (!prompt) return;
+    emitGameEvent(this.game.events, 'choice-prompt', {
+      title: prompt.type === 'training' ? 'TRAINING ROOM' : `NÍVEL ${this.state.hero.level}`,
+      options: this.choiceOptions(),
+      selected: this.choice,
+    });
   }
 
   /** Aplica os eventos do core na tela, na ordem. */
@@ -270,7 +289,11 @@ export class GameScene extends Phaser.Scene {
             view.flash();
           }
           const onPlayer = event.targetId === this.state.playerId;
-          pop(event.targetId, `-${event.damage}`, onPlayer ? POP_COLORS.DAMAGE_TAKEN : POP_COLORS.DAMAGE_DEALT);
+          pop(
+            event.targetId,
+            `-${event.damage}${event.critical ? '!' : ''}`,
+            onPlayer ? POP_COLORS.DAMAGE_TAKEN : POP_COLORS.DAMAGE_DEALT,
+          );
           // Tremidinha só quando o player leva um golpe pesado (≥ 20% do HP max)
           if (onPlayer && target && event.damage >= target.maxHp * 0.2) this.cameras.main.shake(80, 0.004);
           break;
@@ -293,11 +316,15 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'training-offered':
-          this.openTrainingPrompt();
+        case 'card-offered':
+          this.openChoice();
           break;
         case 'trained':
           this.redrawMap(); // o altar vira chão
-          emitGameEvent(this.game.events, 'training-closed', {});
+          emitGameEvent(this.game.events, 'choice-closed', {});
+          break;
+        case 'card-picked':
+          emitGameEvent(this.game.events, 'choice-closed', {});
           break;
         case 'descended':
           // O core já trocou mapa e monstros: redesenha tudo e suspende a run
@@ -316,6 +343,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'waited':
         case 'skill-used':
+        case 'countered':
         case 'stats-changed':
         case 'rewarded':
         case 'looted':
@@ -344,6 +372,7 @@ export class GameScene extends Phaser.Scene {
       turn: this.state.turn,
       floor: this.state.floor,
       potions: { hp: countInBag(hero, 'hpPotion'), mana: countInBag(hero, 'manaPotion') },
+      hotbar: formatHotbar(hero),
       gear: {
         weapon: itemName(hero.equipment.weapon),
         armor: itemName(hero.equipment.armor),

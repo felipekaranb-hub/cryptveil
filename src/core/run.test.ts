@@ -18,7 +18,7 @@ function findStairs(state: RunState): Point {
 function walkToStairs(state: RunState, maxTurns = 400): void {
   const startFloor = state.floor;
   for (let i = 0; i < maxTurns && state.floor === startFloor && state.status === 'playing'; i++) {
-    if (state.prompt === 'training') {
+    if (state.prompt) {
       resolvePlayerAction(state, { type: 'choose', index: 0 });
       continue;
     }

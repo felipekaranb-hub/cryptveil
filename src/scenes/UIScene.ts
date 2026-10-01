@@ -8,14 +8,18 @@ import {
   SCENE_KEYS,
   TEXT_COLORS,
 } from '../config/display';
-import { onGameEvent, offGameEvent, type GameEvents } from '../view/events';
-import { bindRenderScale, layoutCamera } from '../view/scaling';
+import { onGameEvent, offGameEvent, type ChoiceOption, type GameEvents } from '../view/events';
+import { bindRenderScale, getRenderScale, layoutCamera } from '../view/scaling';
 
 const LOG_LINES = 14;
 const PANEL_W = MAP_VIEW.x - 32;
 const LEFT_X = 16;
 const RIGHT_X = MAP_VIEW.x + MAP_VIEW.width + 16;
 const HP_BAR_W = PANEL_W - 24;
+const CARD_W = 140;
+const CARD_H = 190;
+/** Cor da borda por raridade (epic = roxo, a mais rara). */
+const RARITY_COLORS = { common: 0x8a8578, rare: 0x3d7fd1, epic: 0xa45ee5, training: 0xc9a55c } as const;
 
 /**
  * HUD por cima do mundo, com câmera própria (não se mexe quando a câmera
@@ -34,6 +38,9 @@ export class UIScene extends Phaser.Scene {
   private overlay!: Phaser.GameObjects.Container;
   private overlayTitle!: Phaser.GameObjects.Text;
   private overlaySub!: Phaser.GameObjects.Text;
+  private hotbarText!: Phaser.GameObjects.Text;
+  /** Tela de escolha (cartas / Training Room), recriada a cada atualização. */
+  private choice: Phaser.GameObjects.Container | null = null;
   private log: string[] = [];
 
   constructor() {
@@ -51,7 +58,7 @@ export class UIScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, 22, 'CRYPTVEIL', style(28, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0);
     this.subtitle = this.add
-      .text(GAME_WIDTH / 2, 56, 'Marco 2c', style(12, TEXT_COLORS.MUTED))
+      .text(GAME_WIDTH / 2, 56, 'Marco 2d', style(12, TEXT_COLORS.MUTED))
       .setOrigin(0.5, 0);
 
     // --- painel esquerdo: status do Knight
@@ -76,14 +83,7 @@ export class UIScene extends Phaser.Scene {
       .setLineSpacing(4);
 
     // Hotbar provisória (Marco 3: hotbar de verdade, com mapeamento no controle)
-    this.add
-      .text(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT - 44,
-        '1 Brutal Strike (5)  ·  2 Berserk (10)  ·  3 Whirlwind Throw (8)  ·  4 Wound Cleansing (10)  ·  5 Poção HP  ·  6 Poção Mana',
-        style(11, TEXT_COLORS.ACCENT),
-      )
-      .setOrigin(0.5);
+    this.hotbarText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 44, '', style(11, TEXT_COLORS.ACCENT)).setOrigin(0.5);
     this.add
       .text(
         GAME_WIDTH / 2,
@@ -105,8 +105,8 @@ export class UIScene extends Phaser.Scene {
     onGameEvent(events, 'player-status', this.onPlayerStatus, this);
     onGameEvent(events, 'log', this.onLog, this);
     onGameEvent(events, 'run-ended', this.onRunEnded, this);
-    onGameEvent(events, 'training-prompt', this.onTrainingPrompt, this);
-    onGameEvent(events, 'training-closed', this.onTrainingClosed, this);
+    onGameEvent(events, 'choice-prompt', this.onChoicePrompt, this);
+    onGameEvent(events, 'choice-closed', this.onChoiceClosed, this);
 
     // HUD em coordenadas lógicas 960×540, desenhado na resolução real
     bindRenderScale(this, (scale) =>
@@ -119,8 +119,8 @@ export class UIScene extends Phaser.Scene {
       offGameEvent(events, 'player-status', this.onPlayerStatus, this);
       offGameEvent(events, 'log', this.onLog, this);
       offGameEvent(events, 'run-ended', this.onRunEnded, this);
-      offGameEvent(events, 'training-prompt', this.onTrainingPrompt, this);
-      offGameEvent(events, 'training-closed', this.onTrainingClosed, this);
+      offGameEvent(events, 'choice-prompt', this.onChoicePrompt, this);
+      offGameEvent(events, 'choice-closed', this.onChoiceClosed, this);
     });
   }
 
@@ -148,12 +148,12 @@ export class UIScene extends Phaser.Scene {
   // ------------------------------------------------------------------ eventos
 
   private onRunStarted({ seed }: GameEvents['run-started']): void {
-    this.subtitle.setText(`Marco 2c  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2d  ·  seed ${seed}`);
     this.overlay.setVisible(false);
   }
 
   private onResumeOffered({ seed, floor, turn }: GameEvents['resume-offered']): void {
-    this.subtitle.setText(`Marco 2c  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2d  ·  seed ${seed}`);
     this.overlayTitle.setText('RUN SUSPENSA').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
     this.overlaySub.setText(
       `Andar ${floor}  ·  turno ${turn}\n\nEnter / A: continuar\nEsc / B: nova run`,
@@ -166,6 +166,7 @@ export class UIScene extends Phaser.Scene {
     this.hpFill.width = Math.round(HP_BAR_W * Math.max(0, s.hp / s.maxHp));
     this.manaText.setText(`Mana ${s.mana}/${s.maxMana}`);
     this.manaFill.width = Math.round(HP_BAR_W * Math.max(0, s.mana / s.maxMana));
+    this.hotbarText.setText(s.hotbar);
     this.statsText.setText(
       [
         `Nível ${s.level}  ·  XP ${s.xp}/${s.xpNext}`,
@@ -183,22 +184,59 @@ export class UIScene extends Phaser.Scene {
     );
   }
 
-  private onTrainingPrompt({ selected }: GameEvents['training-prompt']): void {
-    const atk = selected === 0 ? '> +2 ATK <' : '  +2 ATK  ';
-    const def = selected === 1 ? '> +2 DEF <' : '  +2 DEF  ';
-    this.overlayTitle.setText('TRAINING ROOM').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
-    this.overlaySub.setText(`${atk}      ${def}\n\n←/→ escolher  ·  Enter / A: confirmar\nEscolha única`);
-    this.overlay.setVisible(true);
+  /**
+   * Tela de escolha: até 3 cartas lado a lado dentro do mapa. Borda na cor
+   * da raridade; a selecionada ganha moldura dourada e sobe um pouco.
+   */
+  private onChoicePrompt({ title, options, selected }: GameEvents['choice-prompt']): void {
+    this.choice?.destroy();
+    const scale = getRenderScale();
+    const cx = MAP_VIEW.x + MAP_VIEW.width / 2;
+    const items: Phaser.GameObjects.GameObject[] = [
+      this.add.rectangle(MAP_VIEW.x, MAP_VIEW.y, MAP_VIEW.width, MAP_VIEW.height, 0x000000, 0.8).setOrigin(0),
+      this.add.text(cx, MAP_VIEW.y + 18, title, style(22, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0),
+      this.add
+        .text(cx, MAP_VIEW.y + MAP_VIEW.height - 28, '←/→ escolher  ·  Enter / A: confirmar', style(11, TEXT_COLORS.MUTED))
+        .setOrigin(0.5, 0),
+    ];
+
+    const w = CARD_W;
+    const gap = 14;
+    const total = options.length * w + (options.length - 1) * gap;
+    options.forEach((opt, i) => {
+      const x = cx - total / 2 + i * (w + gap);
+      const isSel = i === selected;
+      const y = MAP_VIEW.y + 70 - (isSel ? 6 : 0);
+      items.push(...this.drawCard(opt, x, y, isSel));
+    });
+
+    this.choice = this.add.container(0, 0, items);
+    for (const obj of items) if (obj instanceof Phaser.GameObjects.Text) obj.setResolution(scale);
   }
 
-  private onTrainingClosed(): void {
-    this.overlay.setVisible(false);
+  private drawCard(opt: ChoiceOption, x: number, y: number, selected: boolean): Phaser.GameObjects.GameObject[] {
+    const color = RARITY_COLORS[opt.rarity];
+    const bg = this.add
+      .rectangle(x, y, CARD_W, CARD_H, selected ? 0x22201a : 0x161616)
+      .setOrigin(0)
+      .setStrokeStyle(selected ? 3 : 2, selected ? COLORS.GOLD : color);
+    const band = this.add.rectangle(x, y, CARD_W, 6, color).setOrigin(0);
+    const wrap = { wordWrap: { width: CARD_W - 16 } };
+    const titleText = this.add.text(x + 8, y + 14, opt.title, { ...style(13), ...wrap, fontStyle: 'bold' });
+    const sub = this.add.text(x + 8, y + 52, opt.subtitle, { ...style(10, `#${color.toString(16).padStart(6, '0')}`), ...wrap });
+    const desc = this.add.text(x + 8, y + 74, opt.description, { ...style(11), ...wrap }).setLineSpacing(3);
+    return [bg, band, titleText, sub, desc];
   }
 
   private onLog({ lines }: GameEvents['log']): void {
     this.log.push(...lines);
     if (this.log.length > LOG_LINES) this.log.splice(0, this.log.length - LOG_LINES);
     this.logText.setText(this.log.join('\n'));
+  }
+
+  private onChoiceClosed(): void {
+    this.choice?.destroy();
+    this.choice = null;
   }
 
   private onRunEnded({ result, turns }: GameEvents['run-ended']): void {

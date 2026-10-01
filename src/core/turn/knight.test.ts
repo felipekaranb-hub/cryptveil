@@ -14,9 +14,10 @@ import { resolvePlayerAction } from './TurnManager';
 const WAIT: Action = { type: 'wait' };
 const skill = (slot: 1 | 2 | 3 | 4 | 5 | 6): Action => ({ type: 'skill', slot });
 
-/** Sala de teste só com o Knight em (7,5) e os goblins pedidos. */
+/** Sala de teste só com o Knight em (7,5), as 4 skills liberadas e os goblins pedidos. */
 function arena(goblins: { x: number; y: number }[], seed = 1): RunState {
   const state = createTestRun(seed);
+  state.hero.skills = { brutalStrike: 1, berserk: 1, whirlwindThrow: 1, woundCleansing: 1 };
   getPlayer(state).pos = { x: 7, y: 5 };
   state.entities = [getPlayer(state), ...goblins.map((pos, i) => goblin(`g${i}`, pos))];
   return state;
@@ -291,7 +292,7 @@ describe('salas exploradas e Training Room', () => {
     setTile(state.map, { x: 8, y: 5 }, TileType.TRAINING);
     const r = resolvePlayerAction(state, { type: 'move', dir: 'E' });
     expect(r.events).toContainEqual({ type: 'training-offered' });
-    expect(state.prompt).toBe('training');
+    expect(state.prompt).toEqual({ type: 'training' });
 
     expect(resolvePlayerAction(state, WAIT)).toMatchObject({ tookTurn: false, reason: 'awaiting-choice' });
 

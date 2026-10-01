@@ -9,7 +9,8 @@ import { getPlayer, type RunState } from '../run';
 /**
  * "Sala explorada" (decidido no Marco 2b): o player entrou nela E todos os
  * monstros que nasceram nela morreram. Sala sem monstro conta ao entrar.
- * A cada ROOMS_PER_TRAINING salas, o próximo andar ganha uma Training Room.
+ * A cada ROOMS_PER_TRAINING salas, o próximo andar ganha uma Training Room
+ * (16 → ~0,5 por andar pra quem explora; regra implícita, o jogador não vê).
  */
 export function updateRoomProgress(state: RunState, events: CoreEvent[]): void {
   const { hero } = state;

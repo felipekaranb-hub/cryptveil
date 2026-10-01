@@ -1,3 +1,4 @@
+import type { CardId } from './data/cards';
 import type { ItemId } from './data/items';
 import type { SkillId } from './data/skills';
 import type { Point } from './grid';
@@ -14,7 +15,11 @@ export type CoreEvent =
       readonly targetId: string;
       readonly damage: number;
       readonly targetHp: number;
+      /** Golpe crítico (carta Golpe Crítico). */
+      readonly critical: boolean;
     }
+  /** Contra-ataque (carta): o próximo 'attacked' é o revide do player. */
+  | { readonly type: 'countered'; readonly entityId: string }
   | { readonly type: 'died'; readonly entityId: string }
   | { readonly type: 'waited'; readonly entityId: string }
   /** Player pisou na escada: o RunState já está no andar novo (mapa e monstros trocados). */
@@ -25,7 +30,7 @@ export type CoreEvent =
       readonly entityId: string;
       readonly amount: number;
       readonly hp: number;
-      readonly source: 'skill' | 'potion' | 'passive';
+      readonly source: 'skill' | 'potion' | 'passive' | 'vampirism' | 'card';
     }
   | { readonly type: 'mana-restored'; readonly amount: number; readonly mana: number }
   | { readonly type: 'rewarded'; readonly xp: number; readonly gold: number }
@@ -35,6 +40,10 @@ export type CoreEvent =
   | { readonly type: 'room-cleared'; readonly explored: number; readonly trainingEarned: boolean }
   | { readonly type: 'training-offered' }
   | { readonly type: 'trained'; readonly stat: 'atk' | 'def'; readonly amount: number }
+  /** Level up: escolha 1 entre as cartas oferecidas. */
+  | { readonly type: 'card-offered'; readonly offer: readonly CardId[] }
+  /** Carta escolhida. `level` = nível da skill ou pilhas da passiva depois da escolha. */
+  | { readonly type: 'card-picked'; readonly cardId: CardId; readonly level: number }
   /** ATK/DEF efetivos do player mudaram (equipou, treinou): a view mostra "ATK 10 → 16". */
   | {
       readonly type: 'stats-changed';

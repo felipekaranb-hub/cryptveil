@@ -1,5 +1,6 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
+import { applyCard, openCardPromptIfPending } from '../cards';
 import { FINAL_FLOOR } from '../balance';
 import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
 import { isAlive, type Entity } from '../entities/Entity';
@@ -17,7 +18,7 @@ export type TurnFailure = 'wall' | 'not-playing' | 'awaiting-choice' | HotbarFai
 /**
  * Resultado de uma ação do jogador (discriminated union).
  * - tookTurn: false + reason → nada mudou e os inimigos não agiram.
- * - 'free-action' → mudou o estado (escolha da Training Room) sem gastar turno.
+ * - 'free-action' → mudou o estado (escolha de carta ou da Training Room) sem gastar turno.
  */
 export type TurnResult =
   | { readonly tookTurn: false; readonly reason: TurnFailure; readonly events: readonly CoreEvent[] }
@@ -40,14 +41,25 @@ export function resolvePlayerAction(
 
   const events: CoreEvent[] = [];
 
-  // Prompt aberto (Training Room): só a escolha passa, e ela não gasta turno
-  if (state.prompt === 'training') {
+  const rng = Rng.fromState(state.rngState);
+
+  // Prompt aberto (carta ou Training Room): só a escolha passa, e ela não gasta turno
+  if (state.prompt) {
     if (action.type !== 'choose') return fail('awaiting-choice');
-    if (!applyTrainingChoice(state, action.index, events)) return fail('not-a-turn-action');
+    if (state.prompt.type === 'training') {
+      if (!applyTrainingChoice(state, action.index, events)) return fail('not-a-turn-action');
+    } else {
+      const cardId = state.prompt.offer[action.index];
+      if (!cardId) return fail('not-a-turn-action');
+      state.prompt = null;
+      applyCard(state, cardId, events);
+    }
+    // Subiu vários níveis de uma vez: a próxima escolha já abre
+    openCardPromptIfPending(state, rng, events);
+    state.rngState = rng.getState();
     return { tookTurn: false, reason: 'free-action', events };
   }
 
-  const rng = Rng.fromState(state.rngState);
   const player = getPlayer(state);
 
   // --- vez do jogador
@@ -83,7 +95,7 @@ export function resolvePlayerAction(
     }
   } else {
     if (tile === TileType.TRAINING) {
-      state.prompt = 'training';
+      state.prompt = { type: 'training' };
       events.push({ type: 'training-offered' });
     }
     // --- vez dos inimigos, na ordem da lista
@@ -99,6 +111,8 @@ export function resolvePlayerAction(
     if (state.status === 'playing') updateRoomProgress(state, events);
   }
 
+  // Level up neste turno: abre a escolha de carta (depois da Training Room, se as duas)
+  openCardPromptIfPending(state, rng, events);
   state.turn += 1;
   state.rngState = rng.getState();
   return { tookTurn: true, events };

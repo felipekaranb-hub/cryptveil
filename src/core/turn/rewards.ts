@@ -3,7 +3,7 @@ import type { ItemId } from '../data/items';
 import { LOOT_TABLES } from '../data/lootTables';
 import type { Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
-import { gainXp, healEntity } from '../hero';
+import { cardTotal, gainXp, healEntity } from '../hero';
 import { receiveItem } from '../items/Inventory';
 import { rollLoot } from '../items/LootTable';
 import type { Rng } from '../rng';
@@ -19,14 +19,19 @@ export function grantKillRewards(state: RunState, victim: Entity, rng: Rng, even
   const player = getPlayer(state);
 
   if (victim.reward) {
-    const gold = Math.max(1, rng.int(victim.reward.goldMin, victim.reward.goldMax));
+    // Carta Caçador: gold e XP extras por kill
+    const gold =
+      Math.max(1, rng.int(victim.reward.goldMin, victim.reward.goldMax)) + cardTotal(hero, 'hunter', (e) => e.gold);
+    const xp = victim.reward.xp + cardTotal(hero, 'hunter', (e) => e.xp);
     hero.gold += gold;
-    events.push({ type: 'rewarded', xp: victim.reward.xp, gold });
-    gainXp(hero, player, victim.reward.xp, events);
+    events.push({ type: 'rewarded', xp, gold });
+    gainXp(hero, player, xp, events);
   }
 
+  // Carta Sede de Sangue: mana extra por kill
   const manaBefore = hero.mana;
-  hero.mana = Math.min(hero.maxMana, hero.mana + MANA_PER_KILL);
+  const manaGain = MANA_PER_KILL + cardTotal(hero, 'bloodthirst', (e) => e.mana);
+  hero.mana = Math.min(hero.maxMana, hero.mana + manaGain);
   if (hero.mana > manaBefore) {
     events.push({ type: 'mana-restored', amount: hero.mana - manaBefore, mana: hero.mana });
   }

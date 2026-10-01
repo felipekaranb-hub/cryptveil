@@ -17,12 +17,28 @@ export function serializeRun(state: RunState): string {
  * v2 (Marco 2a) → v3: ganha o herói do Knight com o equipamento inicial
  * (ATK/DEF efetivos são os mesmos do v2) e começa a contar salas do zero.
  * Monstros já vivos no andar não dão XP/loot; os dos próximos andares, sim.
+ * v3 (Marco 2b) → v4: prompt vira objeto; o Knight do v3 tinha as 4 skills,
+ * então mantém todas no nível 1; sem cartas.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
 const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: () => null,
   2: (old) => ({ ...old, version: 3, hero: createKnightHero(), visitedRooms: [], clearedRooms: [], prompt: null }),
+  3: (old) => {
+    const hero = isRecord(old['hero']) ? old['hero'] : {};
+    return {
+      ...old,
+      version: 4,
+      prompt: old['prompt'] === 'training' ? { type: 'training' } : null,
+      hero: {
+        ...hero,
+        skills: { brutalStrike: 1, berserk: 1, whirlwindThrow: 1, woundCleansing: 1 },
+        cards: {},
+        pendingCardPicks: 0,
+      },
+    };
+  },
 };
 
 /**
@@ -65,6 +81,7 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   }
   const hero = v['hero'];
   if (!isRecord(hero) || !Array.isArray(hero['bag']) || !isRecord(hero['equipment'])) return false;
+  if (!isRecord(hero['skills']) || !isRecord(hero['cards'])) return false;
   for (const key of ['seed', 'turn', 'floor'] as const) {
     if (typeof v[key] !== 'number') return false;
   }

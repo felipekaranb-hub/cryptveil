@@ -1,5 +1,6 @@
 import type { Action, SkillSlot } from '../actions';
 import { damageRange } from '../combat/damage';
+import type { CardId } from '../data/cards';
 import { isWalkable, TileType } from '../dungeon/DungeonMap';
 import type { CoreEvent } from '../events';
 import { manhattan, pointKey, step, DIRECTIONS, type Point } from '../grid';
@@ -31,11 +32,12 @@ export interface RunReport {
   readonly potionsUsed: number;
   readonly trainings: number;
   readonly damageTaken: number;
+  readonly cardsPicked: number;
 }
 
 export function simulateRun(seed: number, maxTurns = 4000): RunReport {
   const state = createRun(seed);
-  const r = { kills: 0, playerHits: 0, skillsUsed: 0, potionsUsed: 0, trainings: 0, damageTaken: 0 };
+  const r = { kills: 0, playerHits: 0, skillsUsed: 0, potionsUsed: 0, trainings: 0, damageTaken: 0, cardsPicked: 0 };
   const count = (events: readonly CoreEvent[]): void => {
     for (const e of events) {
       if (e.type === 'attacked' && e.attackerId === state.playerId) r.playerHits += 1;
@@ -44,6 +46,7 @@ export function simulateRun(seed: number, maxTurns = 4000): RunReport {
       if (e.type === 'skill-used') r.skillsUsed += 1;
       if (e.type === 'healed' && e.source === 'potion') r.potionsUsed += 1;
       if (e.type === 'trained') r.trainings += 1;
+      if (e.type === 'card-picked') r.cardsPicked += 1;
     }
   };
   const act = (a: Action): boolean => {
@@ -53,8 +56,12 @@ export function simulateRun(seed: number, maxTurns = 4000): RunReport {
   };
 
   for (let t = 0; t < maxTurns && state.status === 'playing'; t++) {
-    if (state.prompt === 'training') {
+    if (state.prompt?.type === 'training') {
       act({ type: 'choose', index: r.trainings % 2 });
+      continue;
+    }
+    if (state.prompt?.type === 'card') {
+      act({ type: 'choose', index: pickCard(state.prompt.offer) });
       continue;
     }
     botTurn(state, act);
@@ -112,6 +119,39 @@ function botTurn(state: RunState, act: (a: Action) => boolean): void {
   act({ type: 'wait' });
 }
 
+/**
+ * Escolha de carta do bot: prioridade fixa (cura > skills > sustain > dano).
+ * Régua, não estratégia ótima.
+ */
+const CARD_PRIORITY: readonly CardId[] = [
+  'skillWoundCleansing',
+  'skillBerserk',
+  'vampirism',
+  'skillWhirlwindThrow',
+  'vigor',
+  'might',
+  'ironSkin',
+  'guard',
+  'critical',
+  'skillBrutalStrike',
+  'bloodthirst',
+  'counter',
+  'focus',
+  'hunter',
+];
+
+function pickCard(offer: readonly CardId[]): number {
+  const rank = (id: CardId): number => {
+    const i = CARD_PRIORITY.indexOf(id);
+    return i < 0 ? CARD_PRIORITY.length : i;
+  };
+  let best = 0;
+  offer.forEach((id, i) => {
+    if (rank(id) < rank(offer[best] as CardId)) best = i;
+  });
+  return best;
+}
+
 function stairsOf(state: RunState): Point {
   const i = state.map.tiles.indexOf(TileType.STAIRS);
   return { x: i % state.map.width, y: Math.floor(i / state.map.width) };
@@ -135,5 +175,7 @@ export function summarize(reports: readonly RunReport[]): Record<string, unknown
     skillsPerRun: avg((r) => r.skillsUsed),
     potionsPerRun: avg((r) => r.potionsUsed),
     trainingsPerRun: avg((r) => r.trainings),
+    cardsPerRun: avg((r) => r.cardsPicked),
+    levelByFloor5: avg((r) => (r.floor >= 5 ? r.level : 0)),
   };
 }

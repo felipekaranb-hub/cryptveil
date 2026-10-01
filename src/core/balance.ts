@@ -36,8 +36,8 @@ export const ENEMIES_PER_ROOM = { min: 0, max: 2 } as const;
  * Os monstros reais (Rat/Skeleton/Goblin/Orc) com stats próprios chegam no Marco 4.
  */
 export const PLACEHOLDER_ENEMY_GROWTH = {
-  hpPerFloor: 8,
-  atkPerFloor: 3,
+  hpPerFloor: 10,
+  atkPerFloor: 4,
   xpPerFloor: 2,
   goldPerFloor: 1,
 } as const;
@@ -57,11 +57,19 @@ export const KNIGHT_START_MANA = 30;
  */
 export const MANA_PER_KILL = 4;
 
-/** XP pro próximo nível = XP_PER_LEVEL × nível atual (20, 40, 60…). */
-export const XP_PER_LEVEL = 20;
+/**
+ * XP pro próximo nível = XP_BASE + XP_STEP × (nível − 1).
+ * Marco 2d: curva mais baixa (era 20 × nível) pra render ~8 níveis por região
+ * — cada nível é uma escolha de carta, então nível raro = build parado.
+ */
+export const XP_CURVE = { base: 8, step: 3 } as const;
 
-/** Level up dá só isso (handoff §2.7). Os valores atuais sobem junto. */
+/** Level up: +10 HP max, +10 Mana max e uma escolha de carta (Marco 2d). */
 export const LEVEL_UP_GAIN = { maxHp: 10, maxMana: 10 } as const;
+
+/** Cartas oferecidas por level up, e o peso de cada raridade no sorteio. */
+export const CARD_OFFER_SIZE = 3;
+export const CARD_RARITY_WEIGHTS = { common: 60, rare: 30, epic: 10 } as const;
 
 /** Passiva do Knight: cura por kill. */
 export const KILL_HEAL = 2;
@@ -76,7 +84,9 @@ export const POTION_DROP_CHANCE = { hpPotion: 0.05, manaPotion: 0.08 } as const;
 
 /**
  * Training Room: a cada N salas exploradas (entrou e matou os monstros dela).
- * Era 5 (§2.7 original); o Felipe pediu 5–6 no Marco 2c → 6.
+ * Era 5 (§2.7 original). Marco 2d: meta de 0,5 sala de treino por andar
+ * pra quem explora (~8 salas por andar → 16). Regra implícita de propósito:
+ * quem explora ganha mais, e o jogador não sabe quando vai aparecer.
  */
-export const ROOMS_PER_TRAINING = 6;
+export const ROOMS_PER_TRAINING = 16;
 export const TRAINING_BONUS = 2;

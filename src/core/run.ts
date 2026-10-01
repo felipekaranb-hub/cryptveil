@@ -10,14 +10,17 @@ import { Rng, type RngState } from './rng';
 
 export type RunStatus = 'playing' | 'won' | 'lost';
 
+import type { CardId } from './data/cards';
+
 /**
  * Versão do formato do RunState (e do save da run).
  * 2: andares (Marco 2a). 3: herói, salas exploradas e prompt (Marco 2b).
+ * 4: cartas e skills por nível; prompt vira objeto (Marco 2d).
  */
-export const RUN_STATE_VERSION = 3;
+export const RUN_STATE_VERSION = 4;
 
 /** Escolha pendente que trava o turno até o player responder. */
-export type RunPrompt = 'training';
+export type RunPrompt = { readonly type: 'training' } | { readonly type: 'card'; readonly offer: readonly CardId[] };
 
 /**
  * Estado completo da run. JSON puro: JSON.stringify/parse e continua

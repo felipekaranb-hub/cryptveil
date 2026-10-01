@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 2c). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 2d). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -48,8 +48,8 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | 2.3 | Monstros do MVP | **Rat, Skeleton, Goblin, Orc.** Dragon volta no v1.1. |
 | 2.4 | Equipamento do Knight | Começa com Sword. Tabela abaixo. |
 | 2.5 | Itens | `equipTags: Vocation[]`. Drop universal, equip restrito (`canEquip` aceita a vocação ou `'ALL'`). Fora da vocação → aba "Pra vender". |
-| 2.6 | Stats | Só **ATK** e **DEF**. Skills usam o mesmo ATK. |
-| 2.7 | Training Room | A cada **6** salas exploradas (era 5; mudou no Marco 2c), o próximo andar gera 1 Training Room: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. Level up dá só +10 HP max e +10 Mana max. |
+| 2.6 | Stats | Só **ATK** e **DEF**. Skills usam o mesmo ATK. Crítico, vampirismo etc. são *efeitos de carta*, não stats (Marco 2d). |
+| 2.7 | Training Room e level up | **Sala de treino:** a cada **16** salas exploradas (≈ 0,5 por andar pra quem explora; regra **implícita**, o jogador não vê contador — Marco 2d), o próximo andar gera 1: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. **Level up** (mudou no Marco 2d): +10 HP max, +10 Mana max **e escolha de 1 entre 3 cartas** (§5, Marco 2d). |
 | 2.8 | Slots | Paper doll de 8 (Helmet, Amulet, Armor, Ring, Weapon, Shield, Legs, Boots) + 3 de relíquia. |
 | 2.9 | Flags especiais | Minotaur: 1 ação/turno. Vampire: cura 50% do dano causado. Ghost: `ignoresWalls` no pathfinding, mas não termina movimento em parede. |
 | 2.10 | Ações | Bater em parede não gasta turno. Bump ataca só o tile da direção. Berserk ataca os 4 adjacentes. |
@@ -157,7 +157,8 @@ cryptveil/
     │   ├── rng.ts             # Rng com seed
     │   ├── combat/damage.ts   # Fórmula de dano
     │   ├── events.ts          # CoreEvent (combate, descended, skill-used, healed, rewarded, looted, room-cleared, trained…)
-    │   ├── hero.ts            # HeroState: mana, XP/level, gold, equipamento, inventário, Training Room
+    │   ├── hero.ts            # HeroState: mana, XP/level, gold, equipamento, inventário, skills, cartas
+    │   ├── cards.ts           # Sorteio de cartas (peso por raridade), aplicar carta, abrir escolha
     │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
     │   ├── run.ts             # RunState serializável, createRun, enterNextFloor, createTestRun, consultas
     │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
@@ -169,7 +170,7 @@ cryptveil/
     │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
     │   ├── items/             # Item (canEquip), Inventory (auto-equip), LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
-    │   └── data/              # entities, items, lootTables, skills (+hotbar) — (M4) relics
+    │   └── data/              # entities, items, lootTables, skills (níveis + hotbar), cards — (M4) relics
     ├── input/InputController.ts
     ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
     ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
@@ -227,6 +228,19 @@ Feedback do Felipe jogando o 2b: cura + regen de mana era exploit; Training Room
 - **Simulador headless** em `src/core/sim/` (`SIM=200 npx vitest run src/core/sim`). Mesma régua (bot fixo), 100 seeds: vence **44%**, 3,6 golpes por kill (era 1,8), mortes concentradas nos andares 4–5, nível médio 4, ATK/DEF finais médios 13,8 / 12,6, ~22 skills por run.
 - O "ATK 20 batendo 10" relatado não é bug: com ATK 20 o golpe básico no Goblin dá no mínimo 14. Provavelmente era o Goblin batendo no Knight (o LOG confundia; os números flutuantes resolvem).
 
+#### ✅ Marco 2d — Level up com cartas (entregue em 01/10/2026)
+Pedido do Felipe: sentir progressão de roguelike deckbuilder a cada nível. Modelo escolhido: **escolha de carta no level up + cartas que liberam skills** (estilo Hades), não deckbuilder de mão/baralho.
+- **O Knight começa só com o Brutal Strike.** Berserk e Whirlwind Throw saem como cartas **raras**; Wound Cleansing como carta **épica** (a mais rara: única cura fora de poção).
+- **Carta de skill repetida sobe o nível** da skill (máx. 3). Níveis: Brutal Strike ×2 → custa 3 → ×2,5 · Berserk ×1,25 → ×1,6 → custa 8 · Whirlwind ×1,5 linha 3 → atravessa (todos da linha) → alcance 5 · Wound Cleansing 25% → 40% → custa 6.
+- **Cartas de stat/passiva** (empilham até o limite): Força +15% ATK (5×) · Vigor +20 HP max e cura 20 (5×) · Guarda +2 DEF (5×) · Foco +15 mana max (3×) · Vampirismo cura 15% do dano causado (rara, 1×) · Sede de Sangue +3 mana por kill (3×) · Golpe Crítico 15% de dano ×2 (rara, 2×) · Contra-ataque 25% de revidar (rara, 1×) · Pele de Ferro −2 de dano recebido, mín. 1 (rara, 2×) · Caçador +1 gold e +2 XP por kill (3×).
+- **Sorteio:** 3 cartas diferentes por nível, peso comum 60 / rara 30 / épica 10. Skill no nível máximo e passiva no limite saem do sorteio. Vários níveis de uma vez → escolhas em sequência. A escolha não gasta turno.
+- **Curva de XP** = 8 + 3 × (nível − 1) (era 20 × nível) → ~8 níveis por região.
+- **Hotbar:** cada skill sempre no mesmo slot (1–4); travada aparece "—". A linha da hotbar mostra nível e custo.
+- **Tela de escolha** unificada: cartas lado a lado (borda na cor da raridade, selecionada com moldura dourada); a Training Room usa a mesma tela com 2 cartas.
+- Monstro provisório +10 HP e +4 ATK por andar (era +8/+3).
+- `RunState` v4 (`hero.skills`, `hero.cards`, `hero.pendingCardPicks`, prompt como objeto) com migração do v3 (Knight antigo mantém as 4 skills).
+- **Simulação** (100 seeds, bot com prioridade fixa de cartas): vence 64%, ~8,4 cartas por run, nível médio 9,4, mortes espalhadas pelos andares. Sem boss ainda: o Orc Warlord (Marco 4) é quem deve segurar o fim da região.
+
 ### Marco 3 — UI completa
 HUD (HP/Mana, stats, equipamento de 8 slots + 3 relíquias), BattleLog lendo os eventos do core, hotbar 1–8 (**+ mapeamento no controle**), InventoryUI (Equipado/Pra vender), MiniMap + fog of war (`Set` de `pointKey` por andar).
 
@@ -258,12 +272,12 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 
 - **Lacunas de design (GDD perdido) — decidir no marco indicado:**
   - [x] Marco 2 (decidido em 01/10/2026, números provisórios; balancear depois):
-    - **Skills do Knight**, sem cooldown, só mana (multiplicadores do Marco 2c): **Brutal Strike** (1 alvo adjacente, ATK×2, 5 mana) · **Berserk** (4 adjacentes, ATK×1,25, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,5, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana).
+    - **Skills do Knight**, sem cooldown, só mana (multiplicadores do Marco 2c): **Brutal Strike** (1 alvo adjacente, ATK×2, 5 mana) · **Berserk** (4 adjacentes, ATK×1,25, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,5, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana). Esses são o nível 1; desde o Marco 2d só o Brutal Strike vem de início e as outras saem em carta (ver §5).
     - **Mana:** 30 max no início. ~~Regenera 1 a cada 2 turnos~~ → desde o Marco 2c, +4 por kill (sem regen por turno). HP não regenera sozinho (só passiva +2 por kill e cura).
-    - **XP:** o próximo nível custa `20 × nível atual` (20, 40, 60…). XP de cada monstro no template.
+    - **XP:** ~~`20 × nível atual`~~ → desde o Marco 2d, `8 + 3 × (nível − 1)`. XP de cada monstro no template.
     - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.
     - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
-  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 6 (Marco 2c), o próximo andar ganha uma Training Room.
+  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 16 (Marco 2d; era 6 no 2c), o próximo andar ganha uma Training Room.
   - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (no 2b; desde o 2c vem de kill) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.

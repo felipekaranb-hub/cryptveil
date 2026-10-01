@@ -1,6 +1,8 @@
-import { KNIGHT_START_MANA, LEVEL_UP_GAIN, XP_PER_LEVEL } from './balance';
+import { KNIGHT_START_MANA, LEVEL_UP_GAIN, XP_CURVE } from './balance';
+import { CARDS, type CardEffect, type CardId } from './data/cards';
 import { getItem, type ItemId } from './data/items';
 import { ENTITY_TEMPLATES } from './data/entities';
+import { STARTING_SKILL, type SkillId } from './data/skills';
 import type { Entity } from './entities/Entity';
 import type { CoreEvent } from './events';
 import type { Direction } from './grid';
@@ -34,6 +36,12 @@ export interface HeroState {
   roomsExplored: number;
   /** Training Rooms ganhas que ainda vão aparecer nos próximos andares. */
   trainingPending: number;
+  /** Skills liberadas e o nível de cada uma (1–3). */
+  skills: Partial<Record<SkillId, number>>;
+  /** Cartas de stat/passiva já escolhidas e quantas vezes (empilham). */
+  cards: Partial<Record<CardId, number>>;
+  /** Level ups que ainda não escolheram carta (subiu vários níveis de uma vez). */
+  pendingCardPicks: number;
 }
 
 export function createKnightHero(): HeroState {
@@ -54,13 +62,35 @@ export function createKnightHero(): HeroState {
     bag: [],
     roomsExplored: 0,
     trainingPending: 0,
+    skills: { [STARTING_SKILL]: 1 },
+    cards: {},
+    pendingCardPicks: 0,
   };
 }
 
-/** ATK/DEF efetivos = base + treino + equipamento. */
+/**
+ * Soma de um efeito de carta considerando as pilhas. Ex.: 2× Golpe Crítico
+ * → cardTotal(hero, 'critical', e => e.chance) = 0,30.
+ */
+export function cardTotal<T extends CardEffect['type']>(
+  hero: HeroState,
+  type: T,
+  value: (effect: Extract<CardEffect, { type: T }>) => number,
+): number {
+  let total = 0;
+  for (const [id, stacks] of Object.entries(hero.cards) as [CardId, number][]) {
+    const card = CARDS[id];
+    if (card.kind === 'boon' && card.effect.type === type) {
+      total += value(card.effect as Extract<CardEffect, { type: T }>) * stacks;
+    }
+  }
+  return total;
+}
+
+/** ATK/DEF efetivos = (base + treino + equipamento) × cartas de ATK%, + cartas de DEF. */
 export function refreshPlayerStats(hero: HeroState, player: Entity): void {
   let atk = hero.baseAtk + hero.trainedAtk;
-  let def = hero.baseDef + hero.trainedDef;
+  let def = hero.baseDef + hero.trainedDef + cardTotal(hero, 'def', (e) => e.amount);
   for (const id of Object.values(hero.equipment)) {
     const item = getItem(id);
     if (item.kind === 'equipment') {
@@ -68,7 +98,7 @@ export function refreshPlayerStats(hero: HeroState, player: Entity): void {
       def += item.def;
     }
   }
-  player.atk = atk;
+  player.atk = Math.round(atk * (1 + cardTotal(hero, 'atk-pct', (e) => e.pct)));
   player.def = def;
 }
 
@@ -83,10 +113,13 @@ export function updatePlayerStats(hero: HeroState, player: Entity, events: CoreE
 }
 
 export function xpToNextLevel(level: number): number {
-  return XP_PER_LEVEL * level;
+  return XP_CURVE.base + XP_CURVE.step * (level - 1);
 }
 
-/** Soma XP e sobe quantos níveis couberem (+10 HP max e +10 Mana max cada). */
+/**
+ * Soma XP e sobe quantos níveis couberem: +10 HP max e +10 Mana max cada,
+ * e uma escolha de carta pendente (o TurnManager abre o prompt).
+ */
 export function gainXp(hero: HeroState, player: Entity, xp: number, events: CoreEvent[]): void {
   hero.xp += xp;
   while (hero.xp >= xpToNextLevel(hero.level)) {
@@ -96,6 +129,7 @@ export function gainXp(hero: HeroState, player: Entity, xp: number, events: Core
     player.hp += LEVEL_UP_GAIN.maxHp;
     hero.maxMana += LEVEL_UP_GAIN.maxMana;
     hero.mana += LEVEL_UP_GAIN.maxMana;
+    hero.pendingCardPicks += 1;
     events.push({ type: 'leveled-up', level: hero.level });
   }
 }

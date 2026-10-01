@@ -1,6 +1,6 @@
 import type { SkillSlot } from '../actions';
 import { getItem, type ItemId } from '../data/items';
-import { KNIGHT_HOTBAR, SKILLS, type SkillId } from '../data/skills';
+import { KNIGHT_HOTBAR, resolveSkill, type SkillId } from '../data/skills';
 import { isWalkable } from '../dungeon/DungeonMap';
 import type { Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
@@ -12,7 +12,14 @@ import { entityAt, getPlayer, type RunState } from '../run';
 import { attack } from './combat';
 
 /** Por que uma skill/poção não saiu. Nada muda e o turno não passa. */
-export type HotbarFailure = 'not-a-turn-action' | 'no-mana' | 'no-target' | 'full-hp' | 'full-mana' | 'no-item';
+export type HotbarFailure =
+  | 'not-a-turn-action'
+  | 'skill-locked'
+  | 'no-mana'
+  | 'no-target'
+  | 'full-hp'
+  | 'full-mana'
+  | 'no-item';
 
 /** Usa o que estiver no slot da hotbar. true = gastou o turno. */
 export function useHotbarSlot(
@@ -31,8 +38,10 @@ export function useHotbarSlot(
  * (sem mana, sem alvo, HP cheio), nada mudou.
  */
 export function castSkill(state: RunState, id: SkillId, rng: Rng, events: CoreEvent[]): true | HotbarFailure {
-  const skill = SKILLS[id];
   const { hero } = state;
+  const level = hero.skills[id];
+  if (!level) return 'skill-locked';
+  const skill = resolveSkill(id, level);
   const player = getPlayer(state);
   if (hero.mana < skill.manaCost) return 'no-mana';
 
@@ -50,12 +59,10 @@ export function castSkill(state: RunState, id: SkillId, rng: Rng, events: CoreEv
         .filter((e): e is Entity => e?.kind === 'enemy');
       if (targets.length === 0) return 'no-target';
       break;
-    case 'ranged': {
-      const t = enemyInLine(state, player, hero.facing, skill.range);
-      if (!t) return 'no-target';
-      targets = [t];
+    case 'ranged':
+      targets = enemiesInLine(state, player, hero.facing, skill.range, skill.pierce);
+      if (targets.length === 0) return 'no-target';
       break;
-    }
     case 'heal':
       if (player.hp >= player.maxHp) return 'full-hp';
       break;
@@ -106,19 +113,25 @@ function adjacentEnemy(state: RunState, from: Entity, facing: Direction): Entity
   return undefined;
 }
 
-/** Primeiro inimigo em linha reta até `range`, sem atravessar parede nem outra entidade. */
-function enemyInLine(state: RunState, from: Entity, facing: Direction, range: number): Entity | undefined {
+/**
+ * Inimigos em linha reta até `range`, na primeira direção que tiver algum
+ * (a que o player olha primeiro). Parede sempre bloqueia. Sem `pierce`, só
+ * o primeiro da linha; com `pierce`, todos até a parede ou o alcance.
+ */
+function enemiesInLine(state: RunState, from: Entity, facing: Direction, range: number, pierce: boolean): Entity[] {
   for (const dir of directionsFrom(facing)) {
+    const hits: Entity[] = [];
     let p = from.pos;
     for (let i = 0; i < range; i++) {
       p = step(p, dir);
       if (!isWalkable(state.map, p)) break;
       const e = entityAt(state, p);
-      if (e) {
-        if (e.kind === 'enemy') return e;
-        break;
-      }
+      if (!e) continue;
+      if (e.kind !== 'enemy') break;
+      hits.push(e);
+      if (!pierce) break;
     }
+    if (hits.length > 0) return hits;
   }
-  return undefined;
+  return [];
 }

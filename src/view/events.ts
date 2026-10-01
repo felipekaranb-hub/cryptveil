@@ -28,13 +28,23 @@ export interface GameEvents {
     turn: number;
     floor: number;
     potions: { hp: number; mana: number };
+    /** Linha da hotbar pronta ("1 Brutal Strike (5) · 2 — · …"). */
+    hotbar: string;
     /** Nome do item em cada slot mostrado (ou '—'). */
     gear: { weapon: string; armor: string; helmet: string; shield: string };
   };
-  /** Prompt da Training Room aberto/atualizado (0 = +ATK, 1 = +DEF). */
-  'training-prompt': { selected: number };
-  'training-closed': Record<string, never>;
+  /** Escolha aberta/atualizada: cartas do level up ou opções da Training Room. */
+  'choice-prompt': { title: string; options: ChoiceOption[]; selected: number };
+  'choice-closed': Record<string, never>;
   'run-ended': { result: Exclude<RunStatus, 'playing'>; turns: number };
+}
+
+/** Uma carta na tela de escolha (texto já pronto pra exibir). */
+export interface ChoiceOption {
+  title: string;
+  subtitle: string;
+  description: string;
+  rarity: 'common' | 'rare' | 'epic' | 'training';
 }
 
 export type GameEventName = keyof GameEvents;
