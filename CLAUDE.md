@@ -1,7 +1,7 @@
 # CLAUDE.md — Cryptveil
 
 Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vitest 5.
-**Leia `docs/HANDOFF.md` inteiro antes de mexer no código** — decisões de design, arquitetura e marcos estão lá. O GDD original é `docs/GAME_BRIEFING.md` (quando adicionado); o handoff vence onde divergirem.
+**Leia `docs/HANDOFF.md` inteiro antes de mexer no código** — decisões de design, arquitetura e marcos estão lá. O GDD original se perdeu: o handoff é a fonte única. Lacuna de design → perguntar ao Felipe (2–3 opções + recomendação) e registrar a decisão no handoff.
 
 ## Como trabalhar
 

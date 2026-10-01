@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026. **Substitui o handoff v1.** Onde o `GAME_BRIEFING.md` (GDD v1.0) divergir deste documento, este documento vence.
+Atualizado em 01/10/2026. **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -19,7 +19,7 @@ Atualizado em 01/10/2026. **Substitui o handoff v1.** Onde o `GAME_BRIEFING.md` 
 
 Roguelite por turnos no navegador, inspirado em Tibia: Knight desce 5 andares gerados por BSP, mata monstros, junta loot, enfrenta o Orc Warlord no andar 5; o que sobra de gold vira meta-progressão no Sanctum.
 
-O GDD completo é o `GAME_BRIEFING.md` (v1.0, 557 linhas) — **ainda não está no repositório**. Precisa estar antes do Marco 2 (loot tables, relíquias, Sanctum vivem lá). Salvar em `docs/GAME_BRIEFING.md`.
+O GDD original (`GAME_BRIEFING.md`, v1.0) **se perdeu** — nem o Felipe tem mais o arquivo. Não procurar nem pedir. O que não está neste documento ainda não foi decidido: cada lacuna é decidida no marco que precisa dela (2–3 opções + recomendação) e registrada aqui. Lacunas conhecidas na §7.
 
 ---
 
@@ -131,7 +131,6 @@ Monstros, itens, relíquias e skills em **`.ts` com `satisfies`**, não `.json`:
 cryptveil/
 ├── CLAUDE.md                  # Instruções curtas pro Claude Code
 ├── docs/HANDOFF.md            # Este documento
-├── docs/GAME_BRIEFING.md      # GDD (falta adicionar)
 ├── index.html
 ├── package.json · tsconfig.json · vite.config.ts
 └── src/
@@ -208,7 +207,11 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 
 ## 7. Pendências e decisões em aberto
 
-- [ ] Adicionar `docs/GAME_BRIEFING.md` (antes do Marco 2).
+- **Lacunas de design (GDD perdido) — decidir no marco indicado:**
+  - [ ] Marco 2: as outras 3 skills do Knight (só o Berserk é conhecido), custo de mana, mana máxima inicial, curva de XP por nível, quanto gold cada kill rende.
+  - [ ] Marco 2: o que é "sala explorada" na Training Room.
+  - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
+  - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [ ] **"Sala explorada"** na Training Room: entrou na sala? Limpou os monstros? Decidir no Marco 2.
 - [ ] Mapeamento das skills no controle (Marco 3).
