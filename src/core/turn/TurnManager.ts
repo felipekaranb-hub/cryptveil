@@ -1,6 +1,6 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
-import { applyCard, openCardPromptIfPending } from '../cards';
+import { applyCard, openCardPromptIfPending, rerollCardOffer } from '../cards';
 import { AGGRO_RANGE, FINAL_FLOOR } from '../balance';
 import { ENTITY_TEMPLATES } from '../data/entities';
 import { buyOffer, sellItem, type ShopFailure } from '../shop';
@@ -24,7 +24,9 @@ export type TurnFailure =
   | HotbarFailure
   | EquipFailure
   | ShopFailure
-  | 'empty-slot';
+  | 'empty-slot'
+  | 'no-rerolls'
+  | 'no-cards';
 
 /**
  * Resultado de uma ação do jogador (discriminated union).
@@ -73,6 +75,12 @@ export function resolvePlayerAction(
 
   // Prompt aberto (carta ou Training Room): só a escolha passa, e ela não gasta turno
   if (state.prompt) {
+    if (action.type === 'reroll' && state.prompt.type === 'card') {
+      const done = rerollCardOffer(state, rng, events);
+      if (done !== true) return fail(done);
+      state.rngState = rng.getState();
+      return { tookTurn: false, reason: 'free-action', events };
+    }
     if (action.type !== 'choose') return fail('awaiting-choice');
     if (state.prompt.type === 'training') {
       if (!applyTrainingChoice(state, action.index, events)) return fail('not-a-turn-action');

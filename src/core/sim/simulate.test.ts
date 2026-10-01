@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { maxedMeta, runBonuses } from '../meta/metaProgress';
 import { simulateRun, summarize } from './simulate';
 
 /**
@@ -19,5 +20,12 @@ describe('simulação headless', () => {
   it.runIf(SIM > 0)(`balanceamento: ${SIM} runs`, { timeout: 600_000 }, () => {
     const reports = Array.from({ length: SIM }, (_, i) => simulateRun(i + 1));
     console.log(JSON.stringify(summarize(reports), null, 2));
+  });
+
+  // Marco 5: a mesma régua com o Sanctum inteiro comprado (teto da meta)
+  it.runIf(SIM > 0)(`balanceamento com a meta no máximo: ${SIM} runs`, { timeout: 600_000 }, () => {
+    const bonuses = runBonuses(maxedMeta());
+    const reports = Array.from({ length: SIM }, (_, i) => simulateRun(i + 1, 4000, bonuses));
+    console.log('META MÁXIMA', JSON.stringify(summarize(reports), null, 2));
   });
 });

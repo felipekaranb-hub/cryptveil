@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from './config/display';
 import { BootScene } from './scenes/BootScene';
+import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
+import { HubScene } from './scenes/HubScene';
 import { UIScene } from './scenes/UIScene';
 import { installRenderScaling } from './view/scaling';
 
@@ -23,7 +25,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.NONE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, GameScene, UIScene],
+  scene: [BootScene, HubScene, GameScene, UIScene, GameOverScene],
 });
 
 installRenderScaling(game);

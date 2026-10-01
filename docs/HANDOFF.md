@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 4). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 5). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -119,7 +119,8 @@ O core recebe `Action` (`src/core/actions.ts`), nunca tecla. `InputController` t
 | Hotbar 5–8 (poções; 7–8 reservados) | 5–8 | **segurar RB** + A / B / X / Y (Marco 3) |
 | Inventário | I | Y |
 | Trocar aba (inventário) | Q / E (ou ←/→) | LB / RB sozinhos (ou ←/→) |
-| Confirmar (e nova run no fim) | Enter | A |
+| Confirmar (no fim da run: vai pro resumo) | Enter | A |
+| Rerrolar a escolha de carta (Tome "Releitura", Marco 5) | Espaço | X |
 | Cancelar | Esc | B |
 
 Repetição de movimento: 130 ms (constantes no `InputController`). Com um ombro segurado, os botões de face viram hotbar e não fazem a ação normal. A hotbar e a linha de ajuda mostram a tecla ou o combo conforme o **último input usado**. **Toque na tela fica pós-MVP.**
@@ -138,8 +139,8 @@ Monstros, itens, relíquias e skills em **`.ts` com `satisfies`**, não `.json`:
 
 ### 4.6 Save
 
-- **Meta-progressão** (gold, upgrades, bestiário): LocalStorage, Marco 5, com `version` + migração.
-- **Run em andamento — MUDOU no v2:** "suspender automático". Salvar a run ao trocar de andar e quando a aba for escondida (`visibilitychange`); ao abrir, oferecer "Continuar". Morte apaga o save (continua roguelite). Entregue no Marco 2a: formato e migração em `core/save/runSave.ts` (lógica pura), LocalStorage em `src/storage/runStorage.ts`. `?seed=` na URL ignora a run suspensa (é pra reproduzir bug). Motivo: navegador de celular mata aba em segundo plano e fechar a aba não pode custar a run.
+- **Meta-progressão** (gold, upgrades, bestiário): LocalStorage (`cryptveil.meta`), entregue no Marco 5 com `version` + migração. Formato em `core/meta/metaProgress.ts`, storage em `src/storage/metaStorage.ts`. Save ilegível não é apagado: o jogo começa uma meta nova e só sobrescreve quando houver algo pra salvar.
+- **Run em andamento — MUDOU no v2:** "suspender automático". Salvar a run ao trocar de andar e quando a aba for escondida (`visibilitychange`); ao abrir, oferecer "Continuar". Morte apaga o save (continua roguelite). Desde o Marco 5 o "Continuar" fica no Sanctum (era um overlay em cima do mapa). Entregue no Marco 2a: formato e migração em `core/save/runSave.ts` (lógica pura), LocalStorage em `src/storage/runStorage.ts`. `?seed=` na URL ignora a run suspensa (é pra reproduzir bug). Motivo: navegador de celular mata aba em segundo plano e fechar a aba não pode custar a run.
 
 ### 4.7 Pastas
 
@@ -173,11 +174,11 @@ cryptveil/
     │   ├── sim/               # Simulação headless de balanceamento (bot fixo + resumo)
     │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
     │   ├── items/             # Item (canEquip), Inventory (auto-equip, equipar/desequipar), LootTable
-    │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
-    │   └── data/              # entities, items (+ materiais), lootTables, skills (níveis + hotbar), cards, relics, shop
+    │   ├── meta/metaProgress.ts # MetaProgress (save versionado), compra de upgrade, conversão do gold, bônus da run, resumo (Marco 5)
+    │   └── data/              # entities, items (+ materiais), lootTables, skills (níveis + hotbar), cards, relics, shop, sanctum (prédios, upgrades, bestiário)
     ├── input/InputController.ts
-    ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
-    ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
+    ├── storage/               # runStorage (run suspensa) e metaStorage (meta) no LocalStorage, com try/catch
+    ├── scenes/                # BootScene, HubScene (Sanctum), GameScene (mundo), UIScene (HUD), GameOverScene
     └── view/                  # coords (tile↔pixel), scaling, events, format (LOG), EntityView
         └── hud/               # model (RunState → dados do HUD), StatusPanel, Hotbar, BattleLog, MiniMap, InventoryScreen, ChoiceScreen
 ```
@@ -281,8 +282,20 @@ Decisões do Felipe (plano com 10 perguntas):
 - **Ajuste pós-teste do Felipe (venda):** vender pilha era um Enter por unidade. Agora, em item com mais de 1 unidade, o Enter pergunta **"Todos ×N (+Xg)" (padrão) ou "Só 1"**; a ação `sell` ganhou `count` e o evento `sold` traz a quantidade e o total.
 - **Risco da §2.12 apareceu:** DEF média final do Knight 15,2. Skeleton (ATK 11, rolagem 8–14) já dá quase sempre 1 de dano nos andares 4–5, e o Orc (12–20) dá 1–5. Quem ameaça no fim é o volume (salas cheias, arremessos) e o boss (ATK 24, ×1,5 enfurecido). Fica pro Marco 6 decidir: subir ATK dos monstros do fim, ou dano com redução percentual.
 
-### Marco 5 — Meta-progressão
-GameOverScene, HubScene (Sanctum: The Vault, Ancient Armory, Tome of Knowledge; Shrine of Vocations só pós-MVP), MetaProgress em LocalStorage versionado, Bestiary básico.
+### ✅ Marco 5 — Meta-progressão (entregue em 01/10/2026)
+Sanctum (`HubScene`), resumo do fim da run (`GameOverScene`), `MetaProgress` versionado no LocalStorage, bestiário básico. `RunState` v7 (`runStats` com kills por monstro; `hero.xpBonusPct`, `bonusOfferCards`, `rerolls`) com migração do v6. 275 testes.
+Decisões do Felipe (plano com 5 perguntas; números provisórios, em `balance.ts` → `META`):
+- **Fluxo:** abrir o jogo → **Sanctum** (tela inicial): Continuar run (se houver suspensa) · Descer à cripta / Nova run · The Vault · Ancient Armory · Tome of Knowledge · Bestiário. Fim da run → VICTORY/YOU DIED no mapa → Enter/A → resumo (andar, nível, turnos, kills, gold convertido) → Sanctum. `?seed=` na URL pula o Sanctum (reproduzir bug), mas a run nasce com os upgrades comprados.
+- **Conversão do gold (1A):** o gold que **sobrou** no fim da run vai pro Sanctum: **vitória 100%, morte 50%**. Gastar no mercador compete com guardar, de propósito. A meta é salva **na hora** da morte/vitória (fechar a aba no resumo não perde nada).
+- **Run abandonada** (decidido na implementação): "Nova run" com uma suspensa pede confirmação (padrão "Não") e **conta como morte** (converte o gold e soma as kills).
+- **The Vault (2A):** sobe a conversão na morte. O plano dizia "50% → 65% → 80%" com 3 preços; ficou **50 → 60 → 70 → 80%** (3 níveis: 60 / 150 / 300g), mantendo o teto de 80%.
+- **Ancient Armory (3A):** **Afiar** +1 ATK por nível (80 / 160 / 320g) e **Reforçar** +10 HP max por nível (60 / 120 / 240g). Sem DEF (§2.12).
+- **Tome of Knowledge (4A+B), duas trilhas:** **Saber**, níveis em sequência (100 / 200 / 350g): 1ª escolha de carta da run com 4 opções → começa a run com 1 carta escolhida (a escolha abre no turno 0; com o nível 1, vem com 4) → +15% de XP por kill. **Releitura**: rerrolar a escolha de carta 1 / 2 / 3 vezes por run (50 / 100 / 200g). Rerrolar é **Espaço / X** na tela de cartas (o mesmo botão de passar o turno; a dica aparece só com rerrolagem sobrando), não gasta turno e não repete as cartas que estavam. Training Room não rerrola.
+- **Bestiário (5A):** os 5 monstros da Região 1 com total de kills; stats (HP/ATK/DEF/XP/gold) só depois da 1ª kill. Conta todo kill do player, inclusive os Orcs invocados pelo boss.
+- **Os upgrades valem a partir da run nova** e ficam gravados no herói (o save da run não depende da meta depois de criada). Mesmo seed → mesmo andar 1 com ou sem meta; a carta inicial sorteia depois do mapa.
+- Sanctum inteiro custa **2.490g**. Com ~120g de kills por run (o que sobra depende do quanto se gasta no mercador) e 50% na morte, são umas 25–40 runs pra completar: provavelmente longo demais; revisar no Marco 6 junto com a renda de gold.
+- **Simulação** (mesma régua, 200 seeds): sem meta continua **41%** (o Sanctum não mexe na run base). Com o Sanctum no máximo: **vence 59%**, 69% chegam ao boss e 85% deles o derrotam, nível médio 11,7, ATK final 25,2. Rodar: `SIM=200 npx vitest run src/core/sim --silent=false` (imprime as duas).
+- Detalhes técnicos: o `InputController` ignora o primeiro frame do controle (botão que confirmou a troca de cena não dispara de novo na cena nova). Cartas da tela de escolha encolhem pra caber 4.
 
 ### Marco 6 — Polish
 Balanceamento com simulação headless, tween de movimento (100 ms), screenshake leve, sprites Kenney, fonte pixel, tela inicial, áudio.
@@ -314,12 +327,13 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
   - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 16 (Marco 2d; era 6 no 2c), o próximo andar ganha uma Training Room.
   - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (no 2b; desde o 2c vem de kill) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
   - [x] Marco 4 (decidido em 01/10/2026, números provisórios): loot tables, stats dos monstros, preços, relíquias (eram 2 no plano; o Felipe quis as 4), mercador e boss. Tudo na §5, Marco 4.
-  - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
+  - [x] Marco 5 (decidido em 01/10/2026, números provisórios): custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; conversão do gold no fim da run. Tudo na §5, Marco 5.
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
 - [ ] Empilhamento de DEF (§2.12) — **confirmado no Marco 4** (Skeleton dá ~1 de dano no fim): decidir no Marco 6.
 - [ ] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** A simulação diz 41%, mas o bot é fraco; jogador de verdade vence com folga. Endurecer no Marco 6 (junto com o risco de DEF da §2.12, que é provavelmente a maior causa: Skeleton/Orc batendo 1 no fim).
-- [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6 (ou no Marco 5, junto com a conversão de gold pra meta).
+- [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6.
+- [ ] Custo total do Sanctum (2.490g) vs. renda de gold por run: provavelmente runs demais pra completar. Revisar no Marco 6.
 
 ---
 

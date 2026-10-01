@@ -76,8 +76,10 @@ export const FONT_FAMILY = 'monospace';
 
 export const SCENE_KEYS = {
   BOOT: 'boot',
+  HUB: 'hub',
   GAME: 'game',
   UI: 'ui',
+  GAME_OVER: 'game-over',
 } as const;
 
 /** Cor de cada tom do LOG (view/format.ts → LogTone). */

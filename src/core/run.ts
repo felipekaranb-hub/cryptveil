@@ -10,6 +10,8 @@ import { createKnightHero, refreshPlayerStats, type HeroState } from './hero';
 import { revealAround, revealStairsIfWatcher } from './fog';
 import { rollMerchant, type MerchantState } from './shop';
 import { Rng, type RngState } from './rng';
+import { openCardPromptIfPending } from './cards';
+import { NO_BONUSES, type RunBonuses } from './meta/metaProgress';
 
 export type RunStatus = 'playing' | 'won' | 'lost';
 
@@ -21,8 +23,15 @@ import type { CardId } from './data/cards';
  * 4: cartas e skills por nível; prompt vira objeto (Marco 2d).
  * 5: fog of war, tiles explorados do andar (Marco 3).
  * 6: relíquias, mercador, escada escondida do boss, habilidades de monstro (Marco 4).
+ * 7: bônus da meta no herói e estatísticas da run (kills por monstro) (Marco 5).
  */
-export const RUN_STATE_VERSION = 6;
+export const RUN_STATE_VERSION = 7;
+
+/** Números da run pro resumo do fim e pro bestiário (Marco 5). */
+export interface RunStats {
+  /** Kills do player por nome do monstro (invocados do boss contam como Orc). */
+  kills: Record<string, number>;
+}
 
 /** Escolha pendente que trava o turno até o player responder. */
 export type RunPrompt =
@@ -61,21 +70,28 @@ export interface RunState {
   readonly playerId: string;
   hero: HeroState;
   prompt: RunPrompt | null;
+  runStats: RunStats;
 }
 
 /** Knight novo com o equipamento inicial já somado no ATK/DEF. */
-function createKnight(pos: Point): { knight: Entity; hero: HeroState } {
+function createKnight(pos: Point, bonuses: RunBonuses = NO_BONUSES): { knight: Entity; hero: HeroState } {
   const knight = createEntity('player', ENTITY_TEMPLATES.knight, pos);
-  const hero = createKnightHero();
+  knight.maxHp += bonuses.maxHp;
+  knight.hp = knight.maxHp;
+  const hero = createKnightHero(bonuses);
   refreshPlayerStats(hero, knight);
   return { knight, hero };
 }
 
-/** Run nova: andar 1 gerado pelo BSP a partir do seed. */
-export function createRun(seed: number): RunState {
+/**
+ * Run nova: andar 1 gerado pelo BSP a partir do seed. `bonuses` = upgrades do
+ * Sanctum. O mapa e os monstros não dependem deles (mesmo seed, mesmo andar 1);
+ * a carta inicial do Tome sorteia depois, com o mesmo Rng.
+ */
+export function createRun(seed: number, bonuses: RunBonuses = NO_BONUSES): RunState {
   const rng = Rng.fromSeed(seed);
   const floor = generateFloor(rng);
-  const { knight, hero } = createKnight(floor.start);
+  const { knight, hero } = createKnight(floor.start, bonuses);
   const enemies = spawnEnemies(1, floor, rng);
   const state: RunState = {
     version: RUN_STATE_VERSION,
@@ -95,8 +111,15 @@ export function createRun(seed: number): RunState {
     playerId: knight.id,
     hero,
     prompt: null,
+    runStats: { kills: {} },
   };
   revealAround(state);
+  if (bonuses.startingCard) {
+    // Tome "Saber" 2: a run já começa com uma escolha de carta aberta
+    hero.pendingCardPicks += 1;
+    openCardPromptIfPending(state, rng, []);
+    state.rngState = rng.getState();
+  }
   return state;
 }
 
@@ -188,6 +211,7 @@ export function createTestRun(seed: number): RunState {
     playerId: knight.id,
     hero,
     prompt: null,
+    runStats: { kills: {} },
   };
   revealAround(state);
   return state;

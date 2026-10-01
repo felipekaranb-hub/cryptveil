@@ -11,7 +11,7 @@ import { StatusPanel } from '../view/hud/StatusPanel';
 import { PANEL_H, PANEL_TOP, PANEL_W, RIGHT_X, textStyle } from '../view/hud/ui';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
-const MILESTONE = 'Marco 4';
+const MILESTONE = 'Marco 5';
 const BOSS_BAR_W = 360;
 
 /**
@@ -70,12 +70,6 @@ export class UIScene extends Phaser.Scene {
       this.subtitle.setText(`${MILESTONE}  ·  seed ${seed}`);
       this.overlay.setVisible(false);
     });
-    this.listen('resume-offered', ({ seed, floor, turn }) => {
-      this.subtitle.setText(`${MILESTONE}  ·  seed ${seed}`);
-      this.overlayTitle.setText('RUN SUSPENSA').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
-      this.overlaySub.setText(`Andar ${floor}  ·  turno ${turn}\n\nEnter / A: continuar\nEsc / B: nova run`);
-      this.overlay.setVisible(true);
-    });
     this.listen('hud', (s) => {
       this.status.update(s);
       this.hotbar.update(s.hotbar);
@@ -105,7 +99,7 @@ export class UIScene extends Phaser.Scene {
         .setText(won ? 'VICTORY' : 'YOU DIED')
         .setFontSize(36)
         .setColor(won ? TEXT_COLORS.ACCENT : '#c0392b');
-      this.overlaySub.setText(`${turns} turnos  ·  Enter / A: nova run`);
+      this.overlaySub.setText(`${turns} turnos  ·  Enter / A: continuar`);
       this.overlay.setVisible(true);
     });
 

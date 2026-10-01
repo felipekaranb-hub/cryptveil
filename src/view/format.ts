@@ -91,6 +91,7 @@ export function formatEvent(event: CoreEvent, state: RunState): LogLine | null {
     case 'trained':
       return line(`Treinou: +${event.amount} ${event.stat.toUpperCase()}`, 'level');
     case 'card-offered':
+      if (event.rerolled) return line(`Releitura: cartas novas (sobram ${state.hero.rerolls})`, 'level');
       return line('Subiu de nível: escolha uma carta', 'level');
     case 'card-picked': {
       const card = CARDS[event.cardId];
@@ -141,6 +142,10 @@ export function formatFailure(result: TurnResult): string | null {
       return 'Os 3 slots de relíquia estão cheios';
     case 'no-offer':
       return 'O mercador não tem isso';
+    case 'no-rerolls':
+      return 'Sem rerrolagens (Tome of Knowledge → Releitura)';
+    case 'no-cards':
+      return 'Não há outras cartas pra sortear';
     default:
       return null;
   }

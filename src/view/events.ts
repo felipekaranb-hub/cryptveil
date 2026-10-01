@@ -12,8 +12,6 @@ import type { HudSnapshot, InventoryView, MinimapView } from './hud/model';
  */
 export interface GameEvents {
   'run-started': { seed: number };
-  /** Achou run suspensa: a UI pergunta se continua (Enter/A) ou começa outra (Esc/B). */
-  'resume-offered': { seed: number; floor: number; turn: number };
   'tile-clicked': { tile: Point };
   /** Linhas novas pro LOG de combate. */
   'log': { lines: LogLine[] };
@@ -28,7 +26,8 @@ export interface GameEvents {
   /** Última origem de input: a UI troca os rótulos (tecla ou botão do controle). */
   'input-source': { source: InputSource };
   /** Escolha aberta/atualizada: cartas do level up ou opções da Training Room. */
-  'choice-prompt': { title: string; options: ChoiceOption[]; selected: number };
+  /** `rerolls`: rerrolagens que sobram (Tome "Releitura"); 0 = não mostra a dica. */
+  'choice-prompt': { title: string; options: ChoiceOption[]; selected: number; rerolls: number };
   'choice-closed': Record<string, never>;
   'run-ended': { result: Exclude<RunStatus, 'playing'>; turns: number };
 }

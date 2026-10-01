@@ -43,6 +43,11 @@ export class InputController {
   private nextRepeatAt = 0;
 
   private prevPadButtons = { A: false, B: false, X: false, Y: false, LB: false, RB: false };
+  /**
+   * Primeiro frame só lê o estado do controle: botão que já vinha apertado
+   * da cena anterior (A que confirmou a troca de cena) não dispara de novo.
+   */
+  private padPrimed = false;
 
   /** Última origem usada — pra UI mostrar "A" ou "Enter" no futuro. */
   lastSource: InputSource = 'keyboard';
@@ -156,6 +161,10 @@ export class InputController {
     };
     const prev = this.prevPadButtons;
     this.prevPadButtons = now;
+    if (!this.padPrimed) {
+      this.padPrimed = true;
+      return;
+    }
     const pressed = (b: keyof typeof now): boolean => now[b] && !prev[b];
 
     if (pressed('LB')) this.emit({ type: 'page', delta: -1 }, 'gamepad');

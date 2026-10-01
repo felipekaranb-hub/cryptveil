@@ -6,6 +6,7 @@ import type { CoreEvent } from '../events';
 import { manhattan, pointKey, step, DIRECTIONS, type Point } from '../grid';
 import { countInBag } from '../hero';
 import { bfsFirstStep } from '../pathfinding';
+import { NO_BONUSES, type RunBonuses } from '../meta/metaProgress';
 import { createRun, getPlayer, livingEnemies, type RunState } from '../run';
 import { getItem } from '../data/items';
 import { canEquip, equipmentScore } from '../items/Item';
@@ -45,8 +46,8 @@ export interface RunReport {
   readonly bossKilled: boolean;
 }
 
-export function simulateRun(seed: number, maxTurns = 4000): RunReport {
-  const state = createRun(seed);
+export function simulateRun(seed: number, maxTurns = 4000, bonuses: RunBonuses = NO_BONUSES): RunReport {
+  const state = createRun(seed, bonuses);
   const r = {
     kills: 0,
     playerHits: 0,

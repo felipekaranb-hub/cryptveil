@@ -5,8 +5,8 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 
 ## Onde estamos (atualizado em 01/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war) e 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias). Tudo publicado na `main`.
-- **Próximo:** Marco 5 — meta-progressão (GameOverScene, HubScene/Sanctum com The Vault, Ancient Armory e Tome of Knowledge, MetaProgress versionado, Bestiary básico). Apresentar o plano antes; custos/efeitos do Sanctum e a conversão de gold são lacunas (§7).
+- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) e 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário). Tudo publicado na `main`.
+- **Próximo:** Marco 6 — polish e balanceamento (dificuldade e DEF da §2.12, renda de gold vs. custo do Sanctum, tween, sprites Kenney, fonte, tela inicial, áudio). Apresentar o plano antes.
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)
@@ -37,7 +37,8 @@ SIM=100 npx vitest run src/core/sim --silent=false   # simulação headless de b
 - **Mudou número de balanceamento?** Rode a simulação antes e depois e registre o resultado no handoff. É uma régua (bot fixo), não um jogador ótimo.
 - **Testar no navegador:** Chromium + Playwright já instalados (`require('/opt/node22/lib/node_modules/playwright')`). Pra pular direto pra uma situação, gere um save pelo core (`serializeRun`) e injete com `page.addInitScript` em `localStorage['cryptveil.run']` antes de abrir a página — `page.reload()` não serve, porque o `visibilitychange` da página antiga salva por cima. Teclas: `keyboard.down` + espera ~50 ms + `up` (o input é lido por frame).
 - **Não use `pkill -f "vite ..."` no mesmo comando de outras coisas:** o padrão casa com a própria linha de comando e mata tudo.
-- Save da run tem `version` + migração (`core/save/runSave.ts`): mudou o formato do `RunState`, suba a versão e escreva a migração com teste.
+- Save da run tem `version` + migração (`core/save/runSave.ts`): mudou o formato do `RunState`, suba a versão e escreva a migração com teste. A meta (`cryptveil.meta`, `core/meta/metaProgress.ts`) tem o mesmo esquema.
+- **O jogo abre no Sanctum** (`HubScene`), não no mapa. Teste no navegador: Enter em "Descer à cripta" (ou injete o save e entre em "Continuar run"); `?seed=` vai direto pro mapa. Pra testar compra, injete `localStorage['cryptveil.meta']` com gold.
 - **Testar o controle sem controle:** no `addInitScript`, troque `navigator.getGamepads` por um pad falso (`mapping: 'standard'`, botões 0–3 = A/B/X/Y, 4/5 = LB/RB) e dispare `gamepadconnected`. O `timestamp` do pad tem que ser **maior** que o `performance.now()` da criação, senão o Phaser ignora os botões.
 - **Andar do boss (5):** não existe escada até o Orc Warlord morrer (`state.hiddenStairs` marca o andar; a escada nasce onde ele cai). Helper de teste ou bot que "anda até a escada" tem que mirar no boss enquanto ele vive, e escolher a carta do level up que o kill dele abre.
 - **Bot de teste no navegador "travado" quase sempre é o bot**, não o jogo: monstro parado num corredor de 1 tile bloqueia o caminho "livre", ou um prompt (carta/loja) ficou aberto. Antes de caçar bug, leia `state.status`, `state.prompt` e `scene.mode`.

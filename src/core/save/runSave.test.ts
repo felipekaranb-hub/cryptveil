@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, createTestRun, getPlayer } from '../run';
+import { createRun, createTestRun, getPlayer, RUN_STATE_VERSION } from '../run';
 import { resolvePlayerAction } from '../turn/TurnManager';
 import { deserializeRun, serializeRun } from './runSave';
 
@@ -58,7 +58,7 @@ describe('migração do save', () => {
     const v2 = { ...rest, version: 2 };
     const migrated = deserializeRun(JSON.stringify(v2));
     expect(migrated).not.toBeNull();
-    expect(migrated!.version).toBe(6);
+    expect(migrated!.version).toBe(RUN_STATE_VERSION);
     expect(migrated!.hero.skills).toEqual({ brutalStrike: 1, berserk: 1, whirlwindThrow: 1, woundCleansing: 1 });
     expect(migrated!.hero.equipment).toEqual({ weapon: 'sword' });
     expect(migrated!.clearedRooms).toEqual([]);
@@ -84,7 +84,7 @@ describe('migração v4 → v5', () => {
     const { explored, ...rest } = state;
     const v4 = { ...rest, version: 4 };
     const migrated = deserializeRun(JSON.stringify(v4));
-    expect(migrated!.version).toBe(6);
+    expect(migrated!.version).toBe(RUN_STATE_VERSION);
     expect(migrated!.explored).toEqual(explored);
     expect(migrated!.hero).toEqual(state.hero);
   });
@@ -102,10 +102,29 @@ describe('migração v5 → v6', () => {
     const { relics: _r, ...hero } = state.hero;
     const v5 = { ...rest, hero, version: 5 };
     const migrated = deserializeRun(JSON.stringify(v5));
-    expect(migrated!.version).toBe(6);
+    expect(migrated!.version).toBe(RUN_STATE_VERSION);
     expect(migrated!.hero.relics).toEqual([]);
     expect(migrated!.merchant).toBeNull();
     expect(migrated!.hiddenStairs).toBeNull();
     expect(resolvePlayerAction(migrated!, { type: 'wait' }).tookTurn).toBe(true);
+  });
+});
+
+describe('migração v6 → v7', () => {
+  it('herói sem bônus de meta, kills zeradas, e continua jogável', () => {
+    const state = createRun(31);
+    const { runStats: _s, ...rest } = state;
+    const { xpBonusPct: _x, bonusOfferCards: _b, rerolls: _r, ...hero } = state.hero;
+    const v6 = { ...rest, hero, version: 6 };
+    const migrated = deserializeRun(JSON.stringify(v6));
+    expect(migrated!.version).toBe(RUN_STATE_VERSION);
+    expect(migrated!.runStats).toEqual({ kills: {} });
+    expect(migrated!.hero).toEqual(state.hero);
+    expect(resolvePlayerAction(migrated!, { type: 'wait' }).tookTurn).toBe(true);
+  });
+
+  it('save sem runStats é rejeitado', () => {
+    const { runStats: _s, ...broken } = createRun(31);
+    expect(deserializeRun(JSON.stringify(broken))).toBeNull();
   });
 });

@@ -65,7 +65,7 @@ export type CoreEvent =
   | { readonly type: 'training-offered' }
   | { readonly type: 'trained'; readonly stat: 'atk' | 'def'; readonly amount: number }
   /** Level up: escolha 1 entre as cartas oferecidas. */
-  | { readonly type: 'card-offered'; readonly offer: readonly CardId[] }
+  | { readonly type: 'card-offered'; readonly offer: readonly CardId[]; readonly rerolled?: boolean }
   /** Carta escolhida. `level` = nível da skill ou pilhas da passiva depois da escolha. */
   | { readonly type: 'card-picked'; readonly cardId: CardId; readonly level: number }
   /** ATK/DEF efetivos do player mudaram (equipou, treinou): a view mostra "ATK 10 → 16". */

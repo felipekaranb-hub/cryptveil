@@ -25,6 +25,8 @@ export function serializeRun(state: RunState): string {
  * v5 (Marco 3) → v6: relíquias (nenhuma), sem mercador e sem escada escondida
  * no andar atual. Os monstros provisórios já vivos continuam como estão; os
  * próximos andares nascem com os monstros reais.
+ * v6 (Marco 4) → v7: herói sem bônus de meta (a run começou antes do Sanctum)
+ * e kills contando a partir de agora.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
@@ -52,6 +54,12 @@ const MIGRATIONS: Readonly<Record<number, Migration>> = {
     merchant: null,
     hiddenStairs: null,
     hero: { ...(isRecord(old['hero']) ? old['hero'] : {}), relics: [] },
+  }),
+  6: (old) => ({
+    ...old,
+    version: 7,
+    runStats: { kills: {} },
+    hero: { ...(isRecord(old['hero']) ? old['hero'] : {}), xpBonusPct: 0, bonusOfferCards: 0, rerolls: 0 },
   }),
 };
 
@@ -102,6 +110,11 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   const hero = v['hero'];
   if (!isRecord(hero) || !Array.isArray(hero['bag']) || !isRecord(hero['equipment'])) return false;
   if (!isRecord(hero['skills']) || !isRecord(hero['cards']) || !Array.isArray(hero['relics'])) return false;
+  for (const key of ['xpBonusPct', 'bonusOfferCards', 'rerolls'] as const) {
+    if (typeof hero[key] !== 'number') return false;
+  }
+  const stats = v['runStats'];
+  if (!isRecord(stats) || !isRecord(stats['kills'])) return false;
   for (const key of ['seed', 'turn', 'floor'] as const) {
     if (typeof v[key] !== 'number') return false;
   }

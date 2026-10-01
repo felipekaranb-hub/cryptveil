@@ -3,7 +3,7 @@ import type { ItemId } from '../data/items';
 import { LOOT_TABLES } from '../data/lootTables';
 import type { Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
-import { cardTotal, gainXp, healEntity, relicEffect } from '../hero';
+import { cardTotal, gainXp, healEntity, relicEffect, withXpBonus } from '../hero';
 import { receiveItem } from '../items/Inventory';
 import { rollLoot } from '../items/LootTable';
 import type { Rng } from '../rng';
@@ -17,11 +17,13 @@ import { getPlayer, type RunState } from '../run';
 export function grantKillRewards(state: RunState, victim: Entity, rng: Rng, events: CoreEvent[]): void {
   const { hero } = state;
   const player = getPlayer(state);
+  // Bestiário (Marco 5): conta todo kill do player, invocado ou não
+  state.runStats.kills[victim.name] = (state.runStats.kills[victim.name] ?? 0) + 1;
 
   // Invocado pelo boss: só metade do XP — sem gold, loot, mana nem cura
   // (decisão do Felipe, Marco 4: não dá pra farmar o boss)
   if (victim.summoned) {
-    const xp = Math.floor((victim.reward?.xp ?? 0) / 2);
+    const xp = withXpBonus(hero, Math.floor((victim.reward?.xp ?? 0) / 2));
     if (xp > 0) {
       events.push({ type: 'rewarded', xp, gold: 0 });
       gainXp(hero, player, xp, events);
@@ -34,7 +36,7 @@ export function grantKillRewards(state: RunState, victim: Entity, rng: Rng, even
     const baseGold =
       Math.max(1, rng.int(victim.reward.goldMin, victim.reward.goldMax)) + cardTotal(hero, 'hunter', (e) => e.gold);
     const gold = Math.ceil(baseGold * (1 + (relicEffect(hero, 'gold-pct')?.pct ?? 0)));
-    const xp = victim.reward.xp + cardTotal(hero, 'hunter', (e) => e.xp);
+    const xp = withXpBonus(hero, victim.reward.xp + cardTotal(hero, 'hunter', (e) => e.xp));
     hero.gold += gold;
     events.push({ type: 'rewarded', xp, gold });
     gainXp(hero, player, xp, events);

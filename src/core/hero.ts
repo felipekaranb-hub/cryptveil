@@ -8,6 +8,7 @@ import type { Entity } from './entities/Entity';
 import type { CoreEvent } from './events';
 import type { Direction } from './grid';
 import type { EquipSlot, Vocation } from './items/Item';
+import { NO_BONUSES, type RunBonuses } from './meta/metaProgress';
 
 /**
  * O que é só do player e não faz sentido num monstro: mana, XP, gold,
@@ -45,6 +46,12 @@ export interface HeroState {
   pendingCardPicks: number;
   /** Relíquias (Marco 4), até RELIC_SLOTS. Compradas no mercador. */
   relics: RelicId[];
+  /** Meta (Marco 5, Tome "Saber" 3): XP extra por kill (0,15 = +15%). */
+  xpBonusPct: number;
+  /** Meta (Tome "Saber" 1): próximas escolhas de carta com +1 opção. */
+  bonusOfferCards: number;
+  /** Meta (Tome "Releitura"): rerrolagens da escolha de carta que sobram na run. */
+  rerolls: number;
 }
 
 /** Slots de relíquia (§2.8). */
@@ -62,11 +69,12 @@ export function relicEffect<T extends RelicEffect['type']>(
   return undefined;
 }
 
-export function createKnightHero(): HeroState {
+/** Herói novo. `bonuses` = upgrades do Sanctum (Marco 5); sem meta, nenhum. */
+export function createKnightHero(bonuses: RunBonuses = NO_BONUSES): HeroState {
   const t = ENTITY_TEMPLATES.knight;
   return {
     vocation: 'KNIGHT',
-    baseAtk: t.atk,
+    baseAtk: t.atk + bonuses.atk,
     baseDef: t.def,
     trainedAtk: 0,
     trainedDef: 0,
@@ -84,7 +92,15 @@ export function createKnightHero(): HeroState {
     cards: {},
     pendingCardPicks: 0,
     relics: [],
+    xpBonusPct: bonuses.xpPct,
+    bonusOfferCards: bonuses.bonusOfferCards,
+    rerolls: bonuses.rerolls,
   };
+}
+
+/** XP de um kill com o bônus do Tome (arredondado). */
+export function withXpBonus(hero: HeroState, xp: number): number {
+  return Math.round(xp * (1 + hero.xpBonusPct));
 }
 
 /**

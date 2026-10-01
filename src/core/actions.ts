@@ -16,6 +16,8 @@ export type Action =
   | { readonly type: 'inventory' }
   /** Escolha num prompt do core (Training Room: 0 = +ATK, 1 = +DEF). */
   | { readonly type: 'choose'; readonly index: number }
+  /** Escolha de carta aberta: troca as cartas (Tome "Releitura", Marco 5). Não gasta turno. */
+  | { readonly type: 'reroll' }
   /** Inventário (Marco 3): vestir item da mochila, tirar do slot, usar poção. Gastam turno. */
   | { readonly type: 'equip'; readonly itemId: ItemId }
   | { readonly type: 'unequip'; readonly slot: EquipSlot }
@@ -41,6 +43,8 @@ export function describeAction(a: Action): string {
       return 'inventory';
     case 'choose':
       return `choose ${a.index}`;
+    case 'reroll':
+      return 'reroll';
     case 'equip':
       return `equip ${a.itemId}`;
     case 'unequip':

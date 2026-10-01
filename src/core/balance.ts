@@ -118,3 +118,36 @@ export const TRAINING_BONUS = 2;
  * (não enxerga através de parede).
  */
 export const CORRIDOR_VISION = 2;
+
+// ------------------------------------------------------- meta-progressão (Marco 5)
+
+/**
+ * Sanctum (decisões do Felipe, Marco 5; números provisórios até o Marco 6).
+ * - Conversão do gold que sobrou no fim da run: vitória 100%; morte (ou run
+ *   abandonada) 50%, e o The Vault sobe isso. Gastar no mercador compete
+ *   com guardar pro Sanctum, de propósito.
+ * - Cada upgrade tem até 3 níveis; `costs[n]` é o preço do nível n + 1.
+ * - Sem upgrade de DEF: o empilhamento de DEF já é o risco da §2.12.
+ */
+export const META = {
+  winConversion: 1,
+  /**
+   * Conversão na morte por nível do The Vault (0–3). O plano dizia
+   * "50% → 65% → 80%" com 3 preços: ficou 50 → 60 → 70 → 80 (teto 80%).
+   */
+  deathConversion: [0.5, 0.6, 0.7, 0.8],
+  costs: {
+    vault: [60, 150, 300],
+    sharpen: [80, 160, 320],
+    reinforce: [60, 120, 240],
+    wisdom: [100, 200, 350],
+    reread: [50, 100, 200],
+  },
+  /** Ancient Armory: por nível. */
+  sharpenAtk: 1,
+  reinforceHp: 10,
+  /** Tome "Saber" nível 3: XP extra por kill. */
+  wisdomXpPct: 0.15,
+  /** Tome "Releitura": rerrolagens da escolha de carta por run = nível. */
+  rerollsPerLevel: 1,
+} as const;

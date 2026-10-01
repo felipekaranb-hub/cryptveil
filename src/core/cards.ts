@@ -14,14 +14,20 @@ export function isCardAvailable(hero: HeroState, id: CardId): boolean {
 }
 
 /**
- * Sorteia até CARD_OFFER_SIZE cartas diferentes, com peso pela raridade
- * (comum 60, rara 30, épica 10). Ordem estável (ordem de CARDS) antes do
- * sorteio, pra ser determinístico pelo Rng.
+ * Sorteia até `size` (padrão CARD_OFFER_SIZE) cartas diferentes, com peso pela
+ * raridade (comum 60, rara 30, épica 10). Ordem estável (ordem de CARDS) antes
+ * do sorteio, pra ser determinístico pelo Rng. `exclude` fica fora do sorteio
+ * (rerrolagem não devolve as mesmas cartas).
  */
-export function rollCardOffer(hero: HeroState, rng: Rng): CardId[] {
-  const pool = (Object.keys(CARDS) as CardId[]).filter((id) => isCardAvailable(hero, id));
+export function rollCardOffer(
+  hero: HeroState,
+  rng: Rng,
+  size: number = CARD_OFFER_SIZE,
+  exclude: readonly CardId[] = [],
+): CardId[] {
+  const pool = (Object.keys(CARDS) as CardId[]).filter((id) => isCardAvailable(hero, id) && !exclude.includes(id));
   const offer: CardId[] = [];
-  while (offer.length < CARD_OFFER_SIZE && pool.length > 0) {
+  while (offer.length < size && pool.length > 0) {
     const weights = pool.map((id) => CARD_RARITY_WEIGHTS[CARDS[id].rarity]);
     const total = weights.reduce((a, b) => a + b, 0);
     let roll = rng.next() * total;
@@ -78,9 +84,27 @@ export function applyCard(state: RunState, id: CardId, events: CoreEvent[]): voi
 export function openCardPromptIfPending(state: RunState, rng: Rng, events: CoreEvent[]): void {
   const { hero } = state;
   if (state.prompt || hero.pendingCardPicks <= 0 || state.status !== 'playing') return;
-  const offer = rollCardOffer(hero, rng);
+  // Tome "Saber" 1: a primeira escolha da run vem com uma carta a mais
+  const bonus = hero.bonusOfferCards > 0 ? 1 : 0;
+  const offer = rollCardOffer(hero, rng, CARD_OFFER_SIZE + bonus);
   hero.pendingCardPicks -= 1;
   if (offer.length === 0) return; // pool esgotado: só os +10 HP/Mana do nível
+  hero.bonusOfferCards -= bonus;
   state.prompt = { type: 'card', offer };
   events.push({ type: 'card-offered', offer });
+}
+
+/**
+ * Tome "Releitura": troca as cartas da escolha aberta por outras (mesmo
+ * tamanho, sem repetir as que estavam). Não gasta turno.
+ */
+export function rerollCardOffer(state: RunState, rng: Rng, events: CoreEvent[]): true | 'no-rerolls' | 'no-cards' {
+  const { hero, prompt } = state;
+  if (prompt?.type !== 'card' || hero.rerolls <= 0) return 'no-rerolls';
+  const offer = rollCardOffer(hero, rng, prompt.offer.length, prompt.offer);
+  if (offer.length === 0) return 'no-cards';
+  hero.rerolls -= 1;
+  state.prompt = { type: 'card', offer };
+  events.push({ type: 'card-offered', offer, rerolled: true });
+  return true;
 }

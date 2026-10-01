@@ -11,6 +11,8 @@ import { resolvePlayerAction } from '../core/turn/TurnManager';
 import { COLORS, FOG, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
 import { InputController, type InputSource } from '../input/InputController';
 import { clearRun, loadRun, saveRun } from '../storage/runStorage';
+import { closeRun, loadMeta } from '../storage/metaStorage';
+import { runBonuses, type RunSummary } from '../core/meta/metaProgress';
 import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
@@ -26,8 +28,10 @@ import {
 } from '../view/hud/model';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
-interface GameSceneData {
+/** Como a GameScene começa: run nova com esse seed, ou a run suspensa (resume). */
+export interface GameSceneData {
   seed?: number;
+  resume?: boolean;
 }
 
 /**
@@ -37,11 +41,10 @@ interface GameSceneData {
  */
 export class GameScene extends Phaser.Scene {
   private state!: RunState;
-  /**
-   * 'resume-offer': achou run suspensa e espera Continuar/Nova run.
-   * 'inventory': tela de inventário aberta (I / Y); o mapa não recebe movimento.
-   */
-  private mode: 'playing' | 'resume-offer' | 'inventory' = 'playing';
+  /** 'inventory': tela de inventário aberta (I / Y); o mapa não recebe movimento. */
+  private mode: 'playing' | 'inventory' = 'playing';
+  /** Resumo da run que acabou (a meta já foi salva); Enter/A leva pra GameOverScene. */
+  private summary: RunSummary | null = null;
   /** Painel aberto no modo 'inventory': inventário (I/Y) ou loja do mercador (prompt do core). */
   private panel: 'inventory' | 'shop' = 'inventory';
   /** Loja: pergunta "vender todos ou 1?" aberta sobre uma pilha (0 = todos, 1 = só 1). */
@@ -69,15 +72,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data: GameSceneData): void {
-    // Prioridade: seed passado no restart → ?seed= na URL → run suspensa → seed novo.
-    // Seed na URL é pra reproduzir bug: ignora a run suspensa (ela fica guardada
-    // até o próximo save desta run nova).
-    const fromUrl = Number(new URLSearchParams(window.location.search).get('seed'));
-    const urlSeed = Number.isInteger(fromUrl) && fromUrl > 0 ? fromUrl : undefined;
-    const suspended = data.seed === undefined && urlSeed === undefined ? loadRun() : null;
-
-    this.mode = suspended ? 'resume-offer' : 'playing';
-    this.state = suspended ?? createRun(data.seed ?? urlSeed ?? randomSeed());
+    // Quem decide é o Sanctum (Continuar / Descer) ou o ?seed= da URL (BootScene).
+    // Run nova já nasce com os upgrades comprados no Sanctum.
+    const suspended = data.resume ? loadRun() : null;
+    this.mode = 'playing';
+    this.summary = null;
+    this.state = suspended ?? createRun(data.seed ?? randomSeed(), runBonuses(loadMeta()));
     this.views.clear();
     this.mapGraphics = null;
     this.fogGraphics = null;
@@ -117,7 +117,7 @@ export class GameScene extends Phaser.Scene {
 
     // Suspender automático: aba escondida (celular troca de app, minimiza) salva a run
     const onVisibility = (): void => {
-      if (document.hidden && this.mode === 'playing') saveRun(this.state);
+      if (document.hidden) saveRun(this.state);
     };
     document.addEventListener('visibilitychange', onVisibility);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -127,9 +127,7 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch(SCENE_KEYS.UI);
     // A UI precisa estar de pé antes de receber o estado inicial
     this.time.delayedCall(0, () => {
-      const { seed, floor, turn } = this.state;
-      if (this.mode === 'resume-offer') emitGameEvent(this.game.events, 'resume-offered', { seed, floor, turn });
-      else this.startPlaying();
+      this.startPlaying();
       this.refreshView();
     });
   }
@@ -234,20 +232,9 @@ export class GameScene extends Phaser.Scene {
       this.handleInventoryInput(action);
       return;
     }
-    if (this.mode === 'resume-offer') {
-      if (action.type === 'confirm') {
-        this.mode = 'playing';
-        this.startPlaying();
-      } else if (action.type === 'cancel') {
-        clearRun();
-        this.restartRun();
-      }
-      return;
-    }
-
     if (this.state.status !== 'playing') {
-      // Fim de run: Enter / A começa outra com seed novo
-      if (action.type === 'confirm') this.restartRun();
+      // Fim de run: Enter / A vai pro resumo (a meta já foi salva na hora da morte/vitória)
+      if (action.type === 'confirm' && this.summary) this.showGameOver(this.summary);
       return;
     }
 
@@ -435,6 +422,11 @@ export class GameScene extends Phaser.Scene {
 
   /** Escolha (carta/Training Room): ←/→ escolhe, Enter/A confirma. O core só recebe a escolha final. */
   private handleChoiceInput(action: Action): void {
+    // Espaço / X (passar o turno) vira "rerrolar" na escolha de carta (Tome "Releitura")
+    if (action.type === 'wait' && this.state.prompt?.type === 'card') {
+      this.act({ type: 'reroll' });
+      return;
+    }
     const count = this.choiceOptions().length;
     if (action.type === 'move' && (action.dir === 'W' || action.dir === 'E')) {
       const delta = action.dir === 'W' ? -1 : 1;
@@ -475,6 +467,7 @@ export class GameScene extends Phaser.Scene {
       title: prompt.type === 'training' ? 'TRAINING ROOM' : `NÍVEL ${this.state.hero.level}`,
       options: this.choiceOptions(),
       selected: this.choice,
+      rerolls: prompt.type === 'card' ? this.state.hero.rerolls : 0,
     });
   }
 
@@ -573,8 +566,10 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'victory':
         case 'defeat':
-          // Roguelite: run acabada não tem "Continuar"
+          // Roguelite: run acabada não tem "Continuar". O gold converte agora,
+          // antes do resumo: fechar a aba aqui não perde nada.
           clearRun();
+          this.summary = closeRun(this.state, event.type === 'victory' ? 'won' : 'lost');
           emitGameEvent(this.game.events, 'run-ended', {
             result: event.type === 'victory' ? 'won' : 'lost',
             turns: this.state.turn,
@@ -668,9 +663,9 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private restartRun(): void {
+  private showGameOver(summary: RunSummary): void {
     this.scene.stop(SCENE_KEYS.UI);
-    this.scene.restart({ seed: randomSeed() } satisfies GameSceneData);
+    this.scene.start(SCENE_KEYS.GAME_OVER, summary);
   }
 
   // ------------------------------------------------------------------- input
