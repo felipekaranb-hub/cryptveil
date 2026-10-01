@@ -10,6 +10,7 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 - Decisão que o handoff não cobre: 2–3 opções + recomendação. Não inventar.
 - O Felipe valida cada Marco rodando local. Não declarar Marco pronto sem `npm run check` verde.
 - Um commit (ou PR) por Marco, mensagem em português.
+- **Publicar ao fechar um Marco** (autorizado pelo Felipe em 01/10/2026): com `npm run check` verde, levar os commits pra `main` (fast-forward a partir da branch da sessão, sem force push) e conferir que o workflow "Deploy no GitHub Pages" terminou com sucesso. O Felipe valida pelo link https://felipekaranb-hub.github.io/cryptveil/, sem revisar PR. Publicar só Marco fechado, não trabalho pela metade.
 
 ## Comandos
 

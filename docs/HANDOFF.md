@@ -251,5 +251,6 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 
 - Código num repositório GitHub, trabalhado pelo **Claude Code** (claude.ai/code ou app). Um commit/PR por Marco, com `npm run check` verde.
 - Repositório público: `github.com/felipekaranb-hub/cryptveil`. Cada push na `main` roda testes + build e publica em **https://felipekaranb-hub.github.io/cryptveil/** (`.github/workflows/deploy.yml`). O Felipe valida cada Marco por esse link, sem instalar nada.
+- **Publicação automática** (decidido em 01/10/2026): o Claude Code trabalha numa branch da sessão (`claude/...`) e, ao fechar um Marco com `npm run check` verde, leva os commits pra `main` e confere o deploy. Sem PR pra revisar; regra registrada no `CLAUDE.md`.
 - Commits com o e-mail noreply do GitHub (o repositório é público).
 - Primeira mensagem de uma instância nova: ler `CLAUDE.md` e este documento, dizer em que Marco o projeto está e apresentar o plano do próximo Marco para aprovação.
