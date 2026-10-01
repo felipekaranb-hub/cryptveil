@@ -87,9 +87,36 @@ export class InventoryScreen {
       s.add.text(left + MAP_VIEW.width / 2, MAP_VIEW.y + MAP_VIEW.height - 16, controls, textStyle(10, TEXT_COLORS.MUTED)).setOrigin(0.5),
     );
 
+    if (view.confirm) items.push(...this.drawConfirm(view.confirm));
+
     this.container = s.add.container(0, 0, items).setDepth(50);
     const scale = getRenderScale();
     for (const obj of items) if (obj instanceof Phaser.GameObjects.Text) obj.setResolution(scale);
+  }
+
+  /** Caixa de pergunta no meio do painel: opções lado a lado, a selecionada em dourado. */
+  private drawConfirm(confirm: NonNullable<InventoryView['confirm']>): Phaser.GameObjects.GameObject[] {
+    const s = this.scene;
+    const w = 340;
+    const h = 96;
+    const x = MAP_VIEW.x + (MAP_VIEW.width - w) / 2;
+    const y = MAP_VIEW.y + (MAP_VIEW.height - h) / 2;
+    const objs: Phaser.GameObjects.GameObject[] = [
+      s.add.rectangle(MAP_VIEW.x, MAP_VIEW.y, MAP_VIEW.width, MAP_VIEW.height, 0x000000, 0.55).setOrigin(0),
+      s.add.rectangle(x, y, w, h, 0x161410).setOrigin(0).setStrokeStyle(2, COLORS.GOLD),
+      s.add.text(x + w / 2, y + 12, confirm.title, textStyle(12, TEXT_COLORS.PRIMARY)).setOrigin(0.5, 0),
+    ];
+    const optW = (w - 36) / confirm.options.length;
+    confirm.options.forEach((label, i) => {
+      const ox = x + 12 + i * (optW + 12);
+      const selected = i === confirm.selected;
+      objs.push(
+        s.add.rectangle(ox, y + 42, optW, 28, selected ? 0x2a2416 : 0x111111).setOrigin(0).setStrokeStyle(1, selected ? COLORS.GOLD : COLORS.FRAME),
+        s.add.text(ox + optW / 2, y + 56, label, textStyle(11, selected ? TEXT_COLORS.ACCENT : TEXT_COLORS.MUTED)).setOrigin(0.5),
+      );
+    });
+    objs.push(s.add.text(x + w / 2, y + h - 14, '←/→ escolher  ·  Enter/A confirmar  ·  Esc/B voltar', textStyle(9, TEXT_COLORS.MUTED)).setOrigin(0.5));
+    return objs;
   }
 
   close(): void {

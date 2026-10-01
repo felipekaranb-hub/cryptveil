@@ -22,7 +22,8 @@ export type Action =
   | { readonly type: 'use-item'; readonly itemId: ItemId }
   /** Loja (Marco 4): comprar a oferta N da lista do mercador; vender uma unidade da mochila. Não gastam turno. */
   | { readonly type: 'buy'; readonly index: number }
-  | { readonly type: 'sell'; readonly itemId: ItemId }
+  /** `count`: quantas unidades (padrão 1; vende até o que tiver). */
+  | { readonly type: 'sell'; readonly itemId: ItemId; readonly count?: number }
   /** Trocar de página/aba (Q/E, LB/RB). Só a view usa; o core ignora. */
   | { readonly type: 'page'; readonly delta: -1 | 1 }
   | { readonly type: 'confirm' }
@@ -49,7 +50,7 @@ export function describeAction(a: Action): string {
     case 'buy':
       return `buy ${a.index}`;
     case 'sell':
-      return `sell ${a.itemId}`;
+      return `sell ${a.itemId}${a.count ? ` ×${a.count}` : ''}`;
     case 'page':
       return `page ${a.delta}`;
     case 'confirm':

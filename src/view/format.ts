@@ -52,7 +52,7 @@ export function formatEvent(event: CoreEvent, state: RunState): LogLine | null {
         'loot',
       );
     case 'sold':
-      return line(`Vendeu ${getItem(event.itemId).name} (+${event.price}g)`, 'loot');
+      return line(`Vendeu ${getItem(event.itemId).name}${event.count > 1 ? ` ×${event.count}` : ''} (+${event.price}g)`, 'loot');
     case 'countered':
       return line('Contra-ataque!');
     case 'died':

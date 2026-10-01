@@ -57,7 +57,9 @@ export function resolvePlayerAction(
   // Loja aberta: comprar, vender e sair não gastam turno
   if (state.prompt?.type === 'shop') {
     if (action.type === 'buy' || action.type === 'sell') {
-      const done = action.type === 'buy' ? buyOffer(state, action.index, events) : sellItem(state, action.itemId, events);
+      const done = action.type === 'buy'
+          ? buyOffer(state, action.index, events)
+          : sellItem(state, action.itemId, events, action.count ?? 1);
       if (done !== true) return fail(done);
     } else if (action.type === 'cancel') {
       state.prompt = null;

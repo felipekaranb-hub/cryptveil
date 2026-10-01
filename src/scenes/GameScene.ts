@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Action } from '../core/actions';
 import { getTile, TileType } from '../core/dungeon/DungeonMap';
 import type { CoreEvent } from '../core/events';
+import type { ItemId } from '../core/data/items';
 import { visibleTiles } from '../core/fog';
 import { DIRECTIONS, inBounds, step } from '../core/grid';
 import { randomSeed } from '../core/rng';
@@ -43,6 +44,8 @@ export class GameScene extends Phaser.Scene {
   private mode: 'playing' | 'resume-offer' | 'inventory' = 'playing';
   /** Painel aberto no modo 'inventory': inventário (I/Y) ou loja do mercador (prompt do core). */
   private panel: 'inventory' | 'shop' = 'inventory';
+  /** Loja: pergunta "vender todos ou 1?" aberta sobre uma pilha (0 = todos, 1 = só 1). */
+  private sellConfirm: { itemId: ItemId; name: string; count: number; unitPrice: number; choice: number } | null = null;
   /** Aba e linha selecionadas no painel. */
   private invTab = 0;
   private invSelected = 0;
@@ -293,6 +296,7 @@ export class GameScene extends Phaser.Scene {
 
   private openPanel(panel: 'inventory' | 'shop'): void {
     this.mode = 'inventory';
+    this.sellConfirm = null;
     this.panel = panel;
     this.invTab = 0;
     this.invSelected = this.firstSelectable(this.inventoryRows(), 0, 1);
@@ -326,6 +330,18 @@ export class GameScene extends Phaser.Scene {
       rows,
       selected: this.invSelected,
       ...(this.panel === 'shop' ? { status: `Seu gold: ${this.state.hero.gold}` } : {}),
+      ...(this.sellConfirm
+        ? {
+            confirm: {
+              title: `Vender ${this.sellConfirm.name}?`,
+              options: [
+                `Todos ×${this.sellConfirm.count} (+${this.sellConfirm.unitPrice * this.sellConfirm.count}g)`,
+                `Só 1 (+${this.sellConfirm.unitPrice}g)`,
+              ],
+              selected: this.sellConfirm.choice,
+            },
+          }
+        : {}),
     });
   }
 
@@ -334,6 +350,10 @@ export class GameScene extends Phaser.Scene {
    * linha diz (equipar, tirar, usar — gasta o turno), Esc/B ou I/Y fecha.
    */
   private handleInventoryInput(action: Action): void {
+    if (this.sellConfirm) {
+      this.handleSellConfirm(action);
+      return;
+    }
     const rows = this.inventoryRows();
     switch (action.type) {
       case 'move': {
@@ -353,6 +373,11 @@ export class GameScene extends Phaser.Scene {
       case 'confirm': {
         const row = rows[this.invSelected];
         if (!row?.action) return;
+        if (row.stack) {
+          // Pilha na loja: pergunta antes (padrão: vender todos)
+          this.sellConfirm = { ...row.stack, choice: 0 };
+          break;
+        }
         this.act(row.action);
         // Turno passou: level up (contra-ataque matou) ou morte fecham o inventário
         if (this.panel === 'inventory' && (this.state.prompt || this.state.status !== 'playing')) {
@@ -377,6 +402,26 @@ export class GameScene extends Phaser.Scene {
         return;
       default:
         return;
+    }
+    this.emitInventory();
+  }
+
+  /** Pergunta da venda: ←/→ (ou ↑/↓) escolhe, Enter/A vende, Esc/B volta pra lista. */
+  private handleSellConfirm(action: Action): void {
+    const confirm = this.sellConfirm;
+    if (!confirm) return;
+    if (action.type === 'move' || action.type === 'page') {
+      confirm.choice = confirm.choice === 0 ? 1 : 0;
+    } else if (action.type === 'confirm') {
+      this.sellConfirm = null;
+      this.act({ type: 'sell', itemId: confirm.itemId, count: confirm.choice === 0 ? confirm.count : 1 });
+      const after = this.inventoryRows();
+      this.invSelected = this.firstSelectable(after, Math.min(this.invSelected, after.length - 1), -1);
+      if (this.invSelected < 0) this.invSelected = this.firstSelectable(after, 0, 1);
+    } else if (action.type === 'cancel') {
+      this.sellConfirm = null;
+    } else {
+      return;
     }
     this.emitInventory();
   }

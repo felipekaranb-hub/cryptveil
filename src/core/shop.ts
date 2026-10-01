@@ -90,13 +90,18 @@ export function buyOffer(state: RunState, index: number, events: CoreEvent[]): t
   return true;
 }
 
-/** Vende uma unidade da mochila (equipado não: tire primeiro no inventário). */
-export function sellItem(state: RunState, itemId: ItemId, events: CoreEvent[]): true | ShopFailure {
+/**
+ * Vende até `count` unidades da mochila (equipado não: tire primeiro no
+ * inventário). Um evento só, com a quantidade e o total.
+ */
+export function sellItem(state: RunState, itemId: ItemId, events: CoreEvent[], count = 1): true | ShopFailure {
   const { hero } = state;
   if (!state.merchant) return 'no-offer';
-  if (!takeFromBag(hero, itemId)) return 'no-item';
-  const price = sellPrice(getItem(itemId), hero.vocation);
+  let sold = 0;
+  while (sold < Math.max(1, count) && takeFromBag(hero, itemId)) sold += 1;
+  if (sold === 0) return 'no-item';
+  const price = sellPrice(getItem(itemId), hero.vocation) * sold;
   hero.gold += price;
-  events.push({ type: 'sold', itemId, price, gold: hero.gold });
+  events.push({ type: 'sold', itemId, count: sold, price, gold: hero.gold });
   return true;
 }

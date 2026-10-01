@@ -36,7 +36,8 @@ export type CoreEvent =
       readonly price: number;
       readonly gold: number;
     }
-  | { readonly type: 'sold'; readonly itemId: ItemId; readonly price: number; readonly gold: number }
+  /** `price` = total recebido pelas `count` unidades. */
+  | { readonly type: 'sold'; readonly itemId: ItemId; readonly count: number; readonly price: number; readonly gold: number }
   /** Contra-ataque (carta): o próximo 'attacked' é o revide do player. */
   | { readonly type: 'countered'; readonly entityId: string }
   | { readonly type: 'died'; readonly entityId: string }

@@ -190,6 +190,8 @@ export interface InventoryRow {
   readonly header?: boolean;
   /** Destaque: melhor que o equipado (↑) ou pior (↓). */
   readonly tone?: 'better' | 'worse';
+  /** Loja: pilha de mais de 1 unidade — o Enter pergunta se vende todas. */
+  readonly stack?: { readonly itemId: ItemId; readonly name: string; readonly count: number; readonly unitPrice: number };
 }
 
 export interface InventoryView {
@@ -199,6 +201,8 @@ export interface InventoryView {
   readonly selected: number;
   /** Texto à direita do rodapé (loja: gold do player). */
   readonly status?: string;
+  /** Pergunta aberta por cima da lista (loja: vender todos ou 1). */
+  readonly confirm?: { readonly title: string; readonly options: readonly string[]; readonly selected: number };
 }
 
 export function buildInventoryRows(state: RunState, tab: number): InventoryRow[] {
@@ -369,12 +373,15 @@ export function buildShopRows(state: RunState, tab: number): InventoryRow[] {
   }
   const rows = grouped(hero.bag).map(([id, count]): InventoryRow => {
     const item = getItem(id);
+    const unitPrice = sellPrice(item, hero.vocation);
+    const what = item.kind === 'equipment' ? itemStats(item) : item.kind === 'material' ? 'Produto de criatura' : 'Poção';
     return {
       text: `${item.name}${count > 1 ? ` ×${count}` : ''}`,
-      detail: `+${sellPrice(item, hero.vocation)}g`,
-      info: item.kind === 'equipment' ? itemStats(item) : item.kind === 'material' ? 'Produto de criatura' : 'Poção',
-      verb: 'vender 1',
+      detail: count > 1 ? `+${unitPrice}g cada` : `+${unitPrice}g`,
+      info: count > 1 ? `${what} · todos: +${unitPrice * count}g` : what,
+      verb: 'vender',
       action: { type: 'sell', itemId: id },
+      ...(count > 1 ? { stack: { itemId: id, name: item.name, count, unitPrice } } : {}),
     };
   });
   return rows.length > 0 ? rows : [header('Mochila vazia (equipado não vende: tire no inventário)')];

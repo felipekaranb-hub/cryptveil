@@ -278,6 +278,7 @@ Decisões do Felipe (plano com 10 perguntas):
 - **Orc Warlord:** fica no lugar da escada do andar 5, sozinho na sala; **a escada só aparece quando ele morre, no tile onde ele caiu** (decidido na implementação: nascer no lugar original deixava a escada às vezes debaixo do Knight, que tinha de sair e voltar). Descer = vitória. Invoca **1 Orc a cada 3 turnos** com o player a até 7 tiles, **máximo 3 vivos**; os invocados rendem **só metade do XP** (sem gold, loot, poção, mana ou cura de kill — não dá pra farmar). Abaixo de 30% **enfurece** (×1,5, corpo vermelho). Drop: Crown Helmet OU Magic Sword, sempre Tower Shield, Plate 40%, Demon Shield 25%. Barra de HP no topo da tela durante a luta.
 - **Relíquias (as 4, decisão do Felipe), compradas no mercador, 3 slots:** Ídolo Dourado (+50% gold por kill, 55g) · Olho do Vigia (visão 4 no corredor e a escada aparece no minimapa ao chegar, 45g) · Pedra de Sangue (kill cura 5% do HP max, 75g) · Totem de Guerra (1º golpe em cada monstro ×2, 85g).
 - **Simulação** (bot agora vende material/equipamento pior, compra relíquia e até 3 poções de HP; 200 seeds): antes do Marco 4 vencia **64%** (sem boss). Agora **vence 41%**; **66% chegam ao boss e 62% deles o derrotam**; mortes por andar 19/9/24/16/50; nível médio 10,4 (8,6 ao chegar no 5); ~119 de gold de kills por run; só 0,3 relíquia por run (o bot gasta pouco; jogador de verdade deve comprar mais — revisar no Marco 6).
+- **Ajuste pós-teste do Felipe (venda):** vender pilha era um Enter por unidade. Agora, em item com mais de 1 unidade, o Enter pergunta **"Todos ×N (+Xg)" (padrão) ou "Só 1"**; a ação `sell` ganhou `count` e o evento `sold` traz a quantidade e o total.
 - **Risco da §2.12 apareceu:** DEF média final do Knight 15,2. Skeleton (ATK 11, rolagem 8–14) já dá quase sempre 1 de dano nos andares 4–5, e o Orc (12–20) dá 1–5. Quem ameaça no fim é o volume (salas cheias, arremessos) e o boss (ATK 24, ×1,5 enfurecido). Fica pro Marco 6 decidir: subir ATK dos monstros do fim, ou dano com redução percentual.
 
 ### Marco 5 — Meta-progressão
@@ -317,6 +318,7 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
 - [ ] Empilhamento de DEF (§2.12) — **confirmado no Marco 4** (Skeleton dá ~1 de dano no fim): decidir no Marco 6.
+- [ ] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** A simulação diz 41%, mas o bot é fraco; jogador de verdade vence com folga. Endurecer no Marco 6 (junto com o risco de DEF da §2.12, que é provavelmente a maior causa: Skeleton/Orc batendo 1 no fim).
 - [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6 (ou no Marco 5, junto com a conversão de gold pra meta).
 
 ---

@@ -72,6 +72,23 @@ describe('mercador', () => {
     expect(state.hero.gold).toBe(gold + sellPrice(ITEMS.sword, 'KNIGHT'));
     expect(state.hero.bag).not.toContain('sword');
 
+    // Vender vários de uma vez: um evento com a quantidade e o total
+    state.hero.bag.push('bone', 'bone', 'bone');
+    const before = state.hero.gold;
+    const many = resolvePlayerAction(state, { type: 'sell', itemId: 'bone', count: 3 });
+    expect(many.events).toContainEqual({
+      type: 'sold',
+      itemId: 'bone',
+      count: 3,
+      price: sellPrice(ITEMS.bone, 'KNIGHT') * 3,
+      gold: before + sellPrice(ITEMS.bone, 'KNIGHT') * 3,
+    });
+    expect(state.hero.bag).not.toContain('bone');
+    // Pedir mais do que tem vende só o que tem
+    state.hero.bag.push('cheese');
+    resolvePlayerAction(state, { type: 'sell', itemId: 'cheese', count: 5 });
+    expect(state.hero.bag).not.toContain('cheese');
+
     // Andar não passa com a loja aberta
     expect(resolvePlayerAction(state, { type: 'move', dir: 'E' })).toMatchObject({ reason: 'awaiting-choice' });
     resolvePlayerAction(state, { type: 'cancel' });
