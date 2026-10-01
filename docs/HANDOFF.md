@@ -211,5 +211,6 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 ## 8. Fluxo de trabalho
 
 - Código num repositório GitHub, trabalhado pelo **Claude Code** (claude.ai/code ou app). Um commit/PR por Marco, com `npm run check` verde.
-- O Felipe valida visualmente rodando local (`git pull && npm install && npm run dev`).
+- Repositório público: `github.com/felipekaranb-hub/cryptveil`. Cada push na `main` roda testes + build e publica em **https://felipekaranb-hub.github.io/cryptveil/** (`.github/workflows/deploy.yml`). O Felipe valida cada Marco por esse link, sem instalar nada.
+- Commits com o e-mail noreply do GitHub (o repositório é público).
 - Primeira mensagem de uma instância nova: ler `CLAUDE.md` e este documento, dizer em que Marco o projeto está e apresentar o plano do próximo Marco para aprovação.
