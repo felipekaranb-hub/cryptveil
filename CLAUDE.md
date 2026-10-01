@@ -3,6 +3,12 @@
 Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vitest 5.
 **Leia `docs/HANDOFF.md` inteiro antes de mexer no código** — decisões de design, arquitetura e marcos estão lá. O GDD original se perdeu: o handoff é a fonte única. Lacuna de design → perguntar ao Felipe (2–3 opções + recomendação) e registrar a decisão no handoff.
 
+## Onde estamos (atualizado em 01/10/2026)
+
+- **Entregues:** Marcos 0, 1, 2a (BSP, andares, suspender automático), 2b (Knight: skills, mana, XP, loot, poções, sala de treino), 2c (ajustes de sensação: mana por kill, números flutuantes) e 2d (level up com cartas). Tudo publicado na `main`.
+- **Próximo:** Marco 3 — UI completa (HUD, hotbar com mapeamento no controle, InventoryUI, minimapa + fog of war). Agora também precisa mostrar o **deck de cartas** da run. Apresentar o plano antes.
+- O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
+
 ## Vocabulário (não confundir)
 
 **Sala** (dentro do andar) → **Andar** (entre duas escadas) → **Região** (conjunto de andares, boss no último) → **Run**. Detalhes em `docs/HANDOFF.md` §0.1.
@@ -23,7 +29,15 @@ npm install
 npm run dev        # localhost:3000
 npm run check      # typecheck + testes — obrigatório antes de commitar
 npm run build      # build estático em dist/
+SIM=100 npx vitest run src/core/sim --silent=false   # simulação headless de balanceamento (~30 s)
 ```
+
+## Dicas práticas (aprendidas na prática)
+
+- **Mudou número de balanceamento?** Rode a simulação antes e depois e registre o resultado no handoff. É uma régua (bot fixo), não um jogador ótimo.
+- **Testar no navegador:** Chromium + Playwright já instalados (`require('/opt/node22/lib/node_modules/playwright')`). Pra pular direto pra uma situação, gere um save pelo core (`serializeRun`) e injete com `page.addInitScript` em `localStorage['cryptveil.run']` antes de abrir a página — `page.reload()` não serve, porque o `visibilitychange` da página antiga salva por cima. Teclas: `keyboard.down` + espera ~50 ms + `up` (o input é lido por frame).
+- **Não use `pkill -f "vite ..."` no mesmo comando de outras coisas:** o padrão casa com a própria linha de comando e mata tudo.
+- Save da run tem `version` + migração (`core/save/runSave.ts`): mudou o formato do `RunState`, suba a versão e escreva a migração com teste.
 
 ## Regras de arquitetura (verificadas por teste)
 
