@@ -1,6 +1,7 @@
 import { TRAINING_BONUS } from '../core/balance';
 import { CARDS, type CardId } from '../core/data/cards';
 import { getItem } from '../core/data/items';
+import { RELICS } from '../core/data/relics';
 import { resolveSkill, SKILLS, skillSummary } from '../core/data/skills';
 import type { HeroState } from '../core/hero';
 import type { CoreEvent } from '../core/events';
@@ -27,15 +28,36 @@ export function formatEvent(event: CoreEvent, state: RunState): LogLine | null {
   const name = (id: string): string => getEntity(state, id)?.name ?? id;
   const line = (text: string, tone: LogTone = 'normal'): LogLine => ({ text, tone });
   switch (event.type) {
-    case 'attacked':
+    case 'attacked': {
+      const crit = event.critical ? ' (crítico!)' : '';
+      const tone = event.targetId === state.playerId ? 'danger' : 'normal';
+      if (event.ranged) {
+        return line(`${name(event.attackerId)} arremessa ${event.ranged.projectile}: ${event.damage}${crit}`, tone);
+      }
+      return line(`${name(event.attackerId)} acerta ${name(event.targetId)}: ${event.damage}${crit}`, tone);
+    }
+    case 'summoned':
+      return line(`${name(event.by)} convoca um ${name(event.entityId)}!`, 'danger');
+    case 'enraged':
+      return line(`${name(event.entityId)} enfurece! (dano ×1,5)`, 'danger');
+    case 'stairs-revealed':
+      return line('A escada apareceu!', 'level');
+    case 'shop-opened':
+      return line('Mercador: "O que vai ser, aventureiro?"', 'loot');
+    case 'shop-closed':
+      return null;
+    case 'bought':
       return line(
-        `${name(event.attackerId)} acerta ${name(event.targetId)}: ${event.damage}${event.critical ? ' (crítico!)' : ''}`,
-        event.targetId === state.playerId ? 'danger' : 'normal',
+        `Comprou ${event.item.kind === 'relic' ? RELICS[event.item.relicId].name : getItem(event.item.itemId).name} (−${event.price}g)`,
+        'loot',
       );
+    case 'sold':
+      return line(`Vendeu ${getItem(event.itemId).name} (+${event.price}g)`, 'loot');
     case 'countered':
       return line('Contra-ataque!');
     case 'died':
-      return event.entityId === state.playerId ? line('Você caiu.', 'danger') : line(`${name(event.entityId)} morreu`, 'good');
+      // A morte do player sai uma vez só, no 'defeat'
+      return event.entityId === state.playerId ? null : line(`${name(event.entityId)} morreu`, 'good');
     case 'waited':
       return line(`${name(event.entityId)} espera`, 'muted');
     case 'descended':
@@ -51,7 +73,8 @@ export function formatEvent(event: CoreEvent, state: RunState): LogLine | null {
     case 'mana-restored':
       return line(`Recupera ${event.amount} de mana`, 'mana');
     case 'rewarded':
-      return line(`+${event.xp} XP  +${event.gold} gold`, 'loot');
+      // Orc invocado pelo boss não dá gold: mostra só o XP
+      return line(event.gold > 0 ? `+${event.xp} XP  +${event.gold} gold` : `+${event.xp} XP`, 'loot');
     case 'leveled-up':
       return line(`Subiu para o nível ${event.level}!`, 'level');
     case 'looted':
@@ -112,6 +135,12 @@ export function formatFailure(result: TurnResult): string | null {
       return 'O Knight não usa esse item';
     case 'empty-slot':
       return 'Não tem nada nesse slot';
+    case 'no-gold':
+      return 'Gold insuficiente';
+    case 'relics-full':
+      return 'Os 3 slots de relíquia estão cheios';
+    case 'no-offer':
+      return 'O mercador não tem isso';
     default:
       return null;
   }

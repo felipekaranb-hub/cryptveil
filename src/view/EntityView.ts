@@ -22,13 +22,13 @@ export class EntityView {
   readonly container: Phaser.GameObjects.Container;
   private readonly body: Phaser.GameObjects.Rectangle;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
-  private readonly baseColor: number;
+  private baseColor: number;
 
   constructor(
     private readonly scene: Phaser.Scene,
     entity: Entity,
   ) {
-    this.baseColor = BODY_COLORS[entity.kind];
+    this.baseColor = entity.boss ? (entity.enraged ? COLORS.BOSS_ENRAGED : COLORS.BOSS) : BODY_COLORS[entity.kind];
 
     this.body = scene.add.rectangle(0, 0, BODY_SIZE, BODY_SIZE, this.baseColor);
     const glyph = scene.add
@@ -90,6 +90,12 @@ export class EntityView {
       ease: 'Quad.easeOut',
       onComplete: () => label.destroy(),
     });
+  }
+
+  /** Boss enfurecido: corpo fica vermelho. */
+  setEnraged(): void {
+    this.baseColor = COLORS.BOSS_ENRAGED;
+    this.body.fillColor = this.baseColor;
   }
 
   /** Pisca verde ao curar. */

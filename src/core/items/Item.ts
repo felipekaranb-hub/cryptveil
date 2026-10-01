@@ -31,10 +31,25 @@ export interface PotionDef {
   readonly value: number;
 }
 
-export type ItemDef = EquipmentDef | PotionDef;
+/** Produto de criatura (Cheese, Bone…): não serve pra nada além de vender (Marco 4). */
+export interface MaterialDef {
+  readonly kind: 'material';
+  readonly name: string;
+  readonly value: number;
+}
+
+export type ItemDef = EquipmentDef | PotionDef | MaterialDef;
 
 export function canEquip(item: ItemDef, vocation: Vocation): item is EquipmentDef {
   return item.kind === 'equipment' && (item.equipTags.includes(vocation) || item.equipTags.includes('ALL'));
+}
+
+/**
+ * "Item da vocação" (regra da loja, Marco 4): equipamento feito PRA ela,
+ * não um de uso geral ('ALL'). Vende por +10% e compra por +10%.
+ */
+export function isVocationItem(item: ItemDef, vocation: Vocation): boolean {
+  return item.kind === 'equipment' && item.equipTags.includes(vocation);
 }
 
 /** Quanto um equipamento soma. Usado pra decidir o auto-equip. */

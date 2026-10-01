@@ -8,6 +8,8 @@ export const TileType = {
   STAIRS: 2,
   /** Centro da Training Room: pisar oferece +2 ATK ou +2 DEF, uma vez. */
   TRAINING: 3,
+  /** Mercador (Marco 4): pisar abre a loja. Fica no andar (dá pra voltar). */
+  MERCHANT: 4,
 } as const;
 export type TileType = (typeof TileType)[keyof typeof TileType];
 

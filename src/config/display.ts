@@ -38,6 +38,11 @@ export const COLORS = {
   HP_GREEN: 0x4caf50,
   HP_YELLOW: 0xd4a72c,
   HP_RED: 0xc0392b,
+  /** Pedra, lança, facas (Marco 4). */
+  PROJECTILE: 0xd8d0b8,
+  /** Corpo do boss (até os sprites do Marco 6) e do boss enfurecido. */
+  BOSS: 0x7a3a8a,
+  BOSS_ENRAGED: 0xc0392b,
 } as const;
 
 export const TILE_COLORS = {
@@ -49,6 +54,8 @@ export const TILE_COLORS = {
   STAIRS_STEP: 0xc9a55c,
   TRAINING: 0x3b2a55,
   TRAINING_MARK: 0xc9a55c,
+  MERCHANT: 0x4a3418,
+  MERCHANT_COIN: 0xe0b84a,
 } as const;
 
 export const TEXT_COLORS = {
@@ -97,4 +104,5 @@ export const MINIMAP_COLORS = {
   TRAINING: 0x8a5ec9,
   PLAYER: 0xe04040,
   ENEMY: 0x7fd15a,
+  MERCHANT: 0xe0b84a,
 } as const;

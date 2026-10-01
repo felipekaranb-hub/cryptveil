@@ -4,7 +4,7 @@ import type { ItemDef } from '../items/Item';
  * Itens do MVP. Bônus e valores PROVISÓRIOS (Marco 6 balanceia).
  * Marco 2c: bônus maiores pra trocar de item ser perceptível (Spike Sword
  * +8 contra +3 da Sword). DEF vigiada pela simulação (risco da §2.12).
- * Itens do boss existem desde já, mas só caem no Marco 4.
+ * Itens do boss caem do Orc Warlord (Marco 4).
  */
 export const ITEMS = {
   // Weapon
@@ -24,8 +24,14 @@ export const ITEMS = {
   towerShield: { kind: 'equipment', name: 'Tower Shield', slot: 'shield', atk: 0, def: 4, equipTags: ['KNIGHT'], value: 50 },
   demonShield: { kind: 'equipment', name: 'Demon Shield', slot: 'shield', atk: 0, def: 7, equipTags: ['KNIGHT'], value: 180 },
   // Poções
-  hpPotion: { kind: 'potion', name: 'Health Potion', effect: { type: 'heal', pct: 0.5 }, value: 10 },
-  manaPotion: { kind: 'potion', name: 'Mana Potion', effect: { type: 'mana', pct: 0.5 }, value: 8 },
+  // Poções: valor = preço na loja (Marco 4). A de HP é a cura forte, custa mais.
+  hpPotion: { kind: 'potion', name: 'Health Potion', effect: { type: 'heal', pct: 0.5 }, value: 25 },
+  manaPotion: { kind: 'potion', name: 'Mana Potion', effect: { type: 'mana', pct: 0.5 }, value: 18 },
+  // Produtos de criatura (Marco 4): só pra vender, garantem que todo kill rende algo
+  cheese: { kind: 'material', name: 'Cheese', value: 4 },
+  goblinEar: { kind: 'material', name: 'Goblin Ear', value: 8 },
+  bone: { kind: 'material', name: 'Bone', value: 10 },
+  orcTooth: { kind: 'material', name: 'Orc Tooth', value: 16 },
 } as const satisfies Record<string, ItemDef>;
 
 export type ItemId = keyof typeof ITEMS;

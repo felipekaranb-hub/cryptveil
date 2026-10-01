@@ -1,5 +1,6 @@
 import type { CardId } from './data/cards';
 import type { ItemId } from './data/items';
+import type { RelicId } from './data/relics';
 import type { SkillId } from './data/skills';
 import type { Point } from './grid';
 
@@ -17,7 +18,25 @@ export type CoreEvent =
       readonly targetHp: number;
       /** Golpe crítico (carta Golpe Crítico). */
       readonly critical: boolean;
+      /** Arremesso de longe (Marco 4): a view anima o projétil. */
+      readonly ranged?: { readonly projectile: string };
     }
+  /** Boss invocou um monstro (Marco 4). */
+  | { readonly type: 'summoned'; readonly entityId: string; readonly by: string }
+  /** Boss abaixo de 30% do HP: dano ×1,5. */
+  | { readonly type: 'enraged'; readonly entityId: string }
+  /** Boss morreu: a escada do andar apareceu. */
+  | { readonly type: 'stairs-revealed'; readonly at: Point }
+  /** Pisou no mercador: loja aberta (prompt). */
+  | { readonly type: 'shop-opened' }
+  | { readonly type: 'shop-closed' }
+  | {
+      readonly type: 'bought';
+      readonly item: { readonly kind: 'item'; readonly itemId: ItemId } | { readonly kind: 'relic'; readonly relicId: RelicId };
+      readonly price: number;
+      readonly gold: number;
+    }
+  | { readonly type: 'sold'; readonly itemId: ItemId; readonly price: number; readonly gold: number }
   /** Contra-ataque (carta): o próximo 'attacked' é o revide do player. */
   | { readonly type: 'countered'; readonly entityId: string }
   | { readonly type: 'died'; readonly entityId: string }

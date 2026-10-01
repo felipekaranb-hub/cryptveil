@@ -7,6 +7,9 @@ import { manhattan, pointKey, step, DIRECTIONS, type Point } from '../grid';
 import { countInBag } from '../hero';
 import { bfsFirstStep } from '../pathfinding';
 import { createRun, getPlayer, livingEnemies, type RunState } from '../run';
+import { getItem } from '../data/items';
+import { canEquip, equipmentScore } from '../items/Item';
+import { shopOffers } from '../shop';
 import { resolvePlayerAction } from '../turn/TurnManager';
 
 /**
@@ -16,7 +19,10 @@ import { resolvePlayerAction } from '../turn/TurnManager';
  *
  * Política do bot: poção de HP abaixo de 35%, cura abaixo de 50%, Berserk
  * com 2+ adjacentes, Brutal Strike quando o golpe básico não mata,
- * Whirlwind em quem vem chegando, caça monstro a até 8 tiles, senão escada.
+ * Whirlwind em quem vem chegando, caça monstro a até 8 tiles, senão escada
+ * (no andar do boss, o lugar da escada: é onde ele está).
+ * Loja (Marco 4): vende material e equipamento pior que o vestido, compra a
+ * relíquia se der e poção de HP até ter 3.
  */
 export interface RunReport {
   readonly seed: number;
@@ -33,11 +39,25 @@ export interface RunReport {
   readonly trainings: number;
   readonly damageTaken: number;
   readonly cardsPicked: number;
+  readonly relics: number;
+  readonly goldEarned: number;
+  readonly reachedBoss: boolean;
+  readonly bossKilled: boolean;
 }
 
 export function simulateRun(seed: number, maxTurns = 4000): RunReport {
   const state = createRun(seed);
-  const r = { kills: 0, playerHits: 0, skillsUsed: 0, potionsUsed: 0, trainings: 0, damageTaken: 0, cardsPicked: 0 };
+  const r = {
+    kills: 0,
+    playerHits: 0,
+    skillsUsed: 0,
+    potionsUsed: 0,
+    trainings: 0,
+    damageTaken: 0,
+    cardsPicked: 0,
+    goldEarned: 0,
+    bossKilled: false,
+  };
   const count = (events: readonly CoreEvent[]): void => {
     for (const e of events) {
       if (e.type === 'attacked' && e.attackerId === state.playerId) r.playerHits += 1;
@@ -47,6 +67,8 @@ export function simulateRun(seed: number, maxTurns = 4000): RunReport {
       if (e.type === 'healed' && e.source === 'potion') r.potionsUsed += 1;
       if (e.type === 'trained') r.trainings += 1;
       if (e.type === 'card-picked') r.cardsPicked += 1;
+      if (e.type === 'rewarded') r.goldEarned += e.gold;
+      if (e.type === 'stairs-revealed') r.bossKilled = true;
     }
   };
   const act = (a: Action): boolean => {
@@ -64,6 +86,10 @@ export function simulateRun(seed: number, maxTurns = 4000): RunReport {
       act({ type: 'choose', index: pickCard(state.prompt.offer) });
       continue;
     }
+    if (state.prompt?.type === 'shop') {
+      botShop(state, act);
+      continue;
+    }
     botTurn(state, act);
   }
 
@@ -77,6 +103,8 @@ export function simulateRun(seed: number, maxTurns = 4000): RunReport {
     atk: p.atk,
     def: p.def,
     ...r,
+    relics: state.hero.relics.length,
+    reachedBoss: state.floor >= 5,
   };
 }
 
@@ -152,7 +180,29 @@ function pickCard(offer: readonly CardId[]): number {
   return best;
 }
 
+/** Vende o que não serve, compra relíquia e poção de HP (até 3), sai. */
+function botShop(state: RunState, act: (a: Action) => boolean): void {
+  const { hero } = state;
+  for (const id of [...hero.bag]) {
+    const item = getItem(id);
+    const current = item.kind === 'equipment' ? hero.equipment[item.slot] : undefined;
+    const currentItem = current ? getItem(current) : undefined;
+    const worse =
+      item.kind === 'equipment' &&
+      (!canEquip(item, hero.vocation) ||
+        (currentItem?.kind === 'equipment' && equipmentScore(item) <= equipmentScore(currentItem)));
+    if (item.kind === 'material' || worse) act({ type: 'sell', itemId: id });
+  }
+  const relic = shopOffers(state).findIndex((o) => o.kind === 'relic' && o.price <= hero.gold);
+  if (relic >= 0) act({ type: 'buy', index: relic });
+  while (countInBag(hero, 'hpPotion') < 3 && act({ type: 'buy', index: 0 })) {
+    // compra até 3 ou acabar o gold
+  }
+  act({ type: 'cancel' });
+}
+
 function stairsOf(state: RunState): Point {
+  if (state.hiddenStairs) return state.entities.find((e) => e.boss && e.hp > 0)?.pos ?? state.hiddenStairs;
   const i = state.map.tiles.indexOf(TileType.STAIRS);
   return { x: i % state.map.width, y: Math.floor(i / state.map.width) };
 }
@@ -177,5 +227,9 @@ export function summarize(reports: readonly RunReport[]): Record<string, unknown
     trainingsPerRun: avg((r) => r.trainings),
     cardsPerRun: avg((r) => r.cardsPicked),
     levelByFloor5: avg((r) => (r.floor >= 5 ? r.level : 0)),
+    reachedBoss: `${Math.round((reports.filter((r) => r.reachedBoss).length / reports.length) * 100)}%`,
+    bossKillRate: `${Math.round((reports.filter((r) => r.bossKilled).length / Math.max(1, reports.filter((r) => r.reachedBoss).length)) * 100)}% de quem chegou`,
+    goldPerRun: avg((r) => r.goldEarned),
+    relicsPerRun: avg((r) => r.relics),
   };
 }

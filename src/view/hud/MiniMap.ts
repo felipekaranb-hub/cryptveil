@@ -11,6 +11,7 @@ const CELL_COLORS: Readonly<Record<Exclude<MiniCell, 0>, number>> = {
   [MiniCell.WALL]: MINIMAP_COLORS.WALL,
   [MiniCell.STAIRS]: MINIMAP_COLORS.STAIRS,
   [MiniCell.TRAINING]: MINIMAP_COLORS.TRAINING,
+  [MiniCell.MERCHANT]: MINIMAP_COLORS.MERCHANT,
 };
 
 /** Minimapa do andar: só o explorado (fog of war), player e monstros à vista. */

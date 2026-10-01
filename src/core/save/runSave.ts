@@ -22,6 +22,9 @@ export function serializeRun(state: RunState): string {
  * então mantém todas no nível 1; sem cartas.
  * v4 (Marco 2d) → v5: fog of war; o andar começa sem nada explorado e o
  * deserializeRun revela o que o Knight vê de onde está.
+ * v5 (Marco 3) → v6: relíquias (nenhuma), sem mercador e sem escada escondida
+ * no andar atual. Os monstros provisórios já vivos continuam como estão; os
+ * próximos andares nascem com os monstros reais.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
@@ -43,6 +46,13 @@ const MIGRATIONS: Readonly<Record<number, Migration>> = {
     };
   },
   4: (old) => ({ ...old, version: 5, explored: [] }),
+  5: (old) => ({
+    ...old,
+    version: 6,
+    merchant: null,
+    hiddenStairs: null,
+    hero: { ...(isRecord(old['hero']) ? old['hero'] : {}), relics: [] },
+  }),
 };
 
 /**
@@ -91,7 +101,7 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   }
   const hero = v['hero'];
   if (!isRecord(hero) || !Array.isArray(hero['bag']) || !isRecord(hero['equipment'])) return false;
-  if (!isRecord(hero['skills']) || !isRecord(hero['cards'])) return false;
+  if (!isRecord(hero['skills']) || !isRecord(hero['cards']) || !Array.isArray(hero['relics'])) return false;
   for (const key of ['seed', 'turn', 'floor'] as const) {
     if (typeof v[key] !== 'number') return false;
   }

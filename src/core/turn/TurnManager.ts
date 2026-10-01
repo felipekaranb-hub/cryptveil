@@ -1,13 +1,15 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
 import { applyCard, openCardPromptIfPending } from '../cards';
-import { FINAL_FLOOR } from '../balance';
+import { AGGRO_RANGE, FINAL_FLOOR } from '../balance';
+import { ENTITY_TEMPLATES } from '../data/entities';
+import { buyOffer, sellItem, type ShopFailure } from '../shop';
 import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
-import { isAlive, type Entity } from '../entities/Entity';
+import { createEntity, isAlive, type Entity } from '../entities/Entity';
 import { revealAround } from '../fog';
 import { equipFromBag, unequipSlot, type EquipFailure } from '../items/Inventory';
 import type { CoreEvent } from '../events';
-import { step, type Direction } from '../grid';
+import { DIRECTIONS, manhattan, step, type Direction } from '../grid';
 import { Rng } from '../rng';
 import { enterNextFloor, entityAt, getPlayer, livingEnemies, type RunState } from '../run';
 import { attack } from './combat';
@@ -15,7 +17,14 @@ import { applyTrainingChoice, updateRoomProgress } from './rooms';
 import { useHotbarSlot, usePotion, type HotbarFailure } from './skills';
 
 /** Por que a ação não gastou turno. */
-export type TurnFailure = 'wall' | 'not-playing' | 'awaiting-choice' | HotbarFailure | EquipFailure | 'empty-slot';
+export type TurnFailure =
+  | 'wall'
+  | 'not-playing'
+  | 'awaiting-choice'
+  | HotbarFailure
+  | EquipFailure
+  | ShopFailure
+  | 'empty-slot';
 
 /**
  * Resultado de uma ação do jogador (discriminated union).
@@ -44,6 +53,21 @@ export function resolvePlayerAction(
   const events: CoreEvent[] = [];
 
   const rng = Rng.fromState(state.rngState);
+
+  // Loja aberta: comprar, vender e sair não gastam turno
+  if (state.prompt?.type === 'shop') {
+    if (action.type === 'buy' || action.type === 'sell') {
+      const done = action.type === 'buy' ? buyOffer(state, action.index, events) : sellItem(state, action.itemId, events);
+      if (done !== true) return fail(done);
+    } else if (action.type === 'cancel') {
+      state.prompt = null;
+      events.push({ type: 'shop-closed' });
+    } else {
+      return fail('awaiting-choice');
+    }
+    state.rngState = rng.getState();
+    return { tookTurn: false, reason: 'free-action', events };
+  }
 
   // Prompt aberto (carta ou Training Room): só a escolha passa, e ela não gasta turno
   if (state.prompt) {
@@ -115,11 +139,16 @@ export function resolvePlayerAction(
     if (tile === TileType.TRAINING) {
       state.prompt = { type: 'training' };
       events.push({ type: 'training-offered' });
+    } else if (tile === TileType.MERCHANT && state.merchant && action.type === 'move') {
+      state.prompt = { type: 'shop' };
+      events.push({ type: 'shop-opened' });
     }
     // --- vez dos inimigos, na ordem da lista
     for (const enemy of livingEnemies(state)) {
       const strategy = enemy.ai ? ai[enemy.ai] : undefined;
       if (!strategy) continue;
+      if (enemy.rangedCooldown) enemy.rangedCooldown -= 1;
+      if (enemy.summon) trySummon(state, enemy, events);
       applyEnemyIntent(state, enemy, strategy(enemy, state), rng, events);
       if (!isAlive(player)) {
         finish(state, 'lost', events);
@@ -179,12 +208,41 @@ function applyEnemyIntent(
       if (target && isAlive(target)) attack(state, enemy, target, 1, rng, events);
       return;
     }
+    case 'ranged': {
+      const target = state.entities.find((e) => e.id === intent.targetId);
+      if (!target || !isAlive(target) || !enemy.ranged) return;
+      enemy.rangedCooldown = enemy.ranged.cooldown;
+      attack(state, enemy, target, enemy.ranged.multiplier, rng, events, { projectile: enemy.ranged.projectile });
+      return;
+    }
     case 'move':
       moveOrAttack(state, enemy, intent.dir, rng, events);
       return;
     case 'idle':
       return;
   }
+}
+
+/**
+ * Invocação do boss (§2.2): com o player por perto, a cada `every` turnos
+ * nasce 1 Orc num tile livre colado nele, até `max` invocados vivos.
+ * É de graça: o boss ainda age normalmente no mesmo turno.
+ */
+function trySummon(state: RunState, boss: Entity, events: CoreEvent[]): void {
+  const summon = boss.summon;
+  const player = getPlayer(state);
+  if (!summon || manhattan(boss.pos, player.pos) > AGGRO_RANGE) return;
+  boss.summonTimer = (boss.summonTimer ?? summon.every) - 1;
+  if (boss.summonTimer > 0) return;
+  const alive = state.entities.filter((e) => e.summoned && isAlive(e)).length;
+  const spot = DIRECTIONS.map((d) => step(boss.pos, d)).find((p) => isWalkable(state.map, p) && !entityAt(state, p));
+  if (alive >= summon.max || !spot) return; // tenta de novo no próximo turno
+  boss.summonTimer = summon.every;
+  const orc = createEntity(`${boss.id}-s${state.entities.length}`, ENTITY_TEMPLATES.orc, spot);
+  orc.summoned = true;
+  if (boss.homeRoom !== undefined) orc.homeRoom = boss.homeRoom;
+  state.entities.push(orc);
+  events.push({ type: 'summoned', entityId: orc.id, by: boss.id });
 }
 
 function finish(state: RunState, status: 'won' | 'lost', events: CoreEvent[]): void {

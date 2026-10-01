@@ -9,7 +9,9 @@ import { refreshPlayerStats } from './hero';
 import { createRun, getPlayer, livingEnemies, type RunState } from './run';
 import { resolvePlayerAction } from './turn/TurnManager';
 
+/** Escada do andar; no andar do boss, o próprio boss enquanto ele vive (a escada só aparece depois). */
 function findStairs(state: RunState): Point {
+  if (state.hiddenStairs) return state.entities.find((e) => e.boss && e.hp > 0)?.pos ?? state.hiddenStairs;
   const i = state.map.tiles.indexOf(TileType.STAIRS);
   return { x: i % state.map.width, y: Math.floor(i / state.map.width) };
 }
@@ -19,7 +21,7 @@ function walkToStairs(state: RunState, maxTurns = 400): void {
   const startFloor = state.floor;
   for (let i = 0; i < maxTurns && state.floor === startFloor && state.status === 'playing'; i++) {
     if (state.prompt) {
-      resolvePlayerAction(state, { type: 'choose', index: 0 });
+      resolvePlayerAction(state, state.prompt.type === 'shop' ? { type: 'cancel' } : { type: 'choose', index: 0 });
       continue;
     }
     const dir: Direction | null = bfsFirstStep(getPlayer(state).pos, findStairs(state), (p) =>
@@ -97,7 +99,7 @@ describe('descer de andar', () => {
     expect(r.events.filter((e) => e.type === 'attacked')).toHaveLength(0);
   });
 
-  it(`a escada do andar ${FINAL_FLOOR} termina a run em vitória`, () => {
+  it(`andar ${FINAL_FLOOR}: o boss guarda a escada; matar ele revela e descer vence`, () => {
     const state = createRun(777);
     const player = getPlayer(state);
     player.hp = 99999;

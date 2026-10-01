@@ -1,12 +1,14 @@
 import { ENTITY_TEMPLATES } from './data/entities';
 import { generateFloor } from './dungeon/DungeonGenerator';
 import { createTestRoom, setTile, TileType, type DungeonMap } from './dungeon/DungeonMap';
-import { spawnEnemies } from './dungeon/populate';
+import { spawnBoss, spawnEnemies } from './dungeon/populate';
+import { FINAL_FLOOR, MERCHANT_FLOORS } from './balance';
 import { roomCenter, roomIndexAt, type Room } from './dungeon/Room';
 import { createEntity, isAlive, type Entity } from './entities/Entity';
 import { samePoint, type Point } from './grid';
 import { createKnightHero, refreshPlayerStats, type HeroState } from './hero';
-import { revealAround } from './fog';
+import { revealAround, revealStairsIfWatcher } from './fog';
+import { rollMerchant, type MerchantState } from './shop';
 import { Rng, type RngState } from './rng';
 
 export type RunStatus = 'playing' | 'won' | 'lost';
@@ -18,11 +20,16 @@ import type { CardId } from './data/cards';
  * 2: andares (Marco 2a). 3: herói, salas exploradas e prompt (Marco 2b).
  * 4: cartas e skills por nível; prompt vira objeto (Marco 2d).
  * 5: fog of war, tiles explorados do andar (Marco 3).
+ * 6: relíquias, mercador, escada escondida do boss, habilidades de monstro (Marco 4).
  */
-export const RUN_STATE_VERSION = 5;
+export const RUN_STATE_VERSION = 6;
 
 /** Escolha pendente que trava o turno até o player responder. */
-export type RunPrompt = { readonly type: 'training' } | { readonly type: 'card'; readonly offer: readonly CardId[] };
+export type RunPrompt =
+  | { readonly type: 'training' }
+  | { readonly type: 'card'; readonly offer: readonly CardId[] }
+  /** Loja do mercador aberta (Marco 4). */
+  | { readonly type: 'shop' };
 
 /**
  * Estado completo da run. JSON puro: JSON.stringify/parse e continua
@@ -43,6 +50,13 @@ export interface RunState {
   clearedRooms: number[];
   /** Fog of war: tiles do andar já vistos (índice y * width + x, ordenado). */
   explored: number[];
+  /** Mercador do andar (estoque), ou null se o andar não tem. */
+  merchant: MerchantState | null;
+  /**
+   * Andar do boss: onde o boss nasceu (e a escada estaria). Enquanto não é
+   * null, não há escada no mapa; ela aparece onde o boss morrer.
+   */
+  hiddenStairs: Point | null;
   entities: Entity[];
   readonly playerId: string;
   hero: HeroState;
@@ -75,6 +89,8 @@ export function createRun(seed: number): RunState {
     visitedRooms: [],
     clearedRooms: [],
     explored: [],
+    merchant: null,
+    hiddenStairs: null,
     entities: [knight, ...enemies],
     playerId: knight.id,
     hero,
@@ -86,8 +102,11 @@ export function createRun(seed: number): RunState {
 
 /**
  * Troca pro próximo andar: mapa e monstros novos, o player mantém o que tem.
- * Se há Training Room pendente, uma sala (nem a inicial, nem a da escada)
- * vira Training Room: sem monstros, tile TRAINING no centro.
+ * Salas especiais (nunca a inicial nem a da escada, sem monstros):
+ * - Training Room, se há uma pendente: tile TRAINING no centro.
+ * - Mercador (MERCHANT_FLOORS): tile MERCHANT no centro e estoque sorteado.
+ * - Andar final: o Orc Warlord fica onde seria a escada; ela aparece onde
+ *   ele morrer. A sala dele não tem outros monstros.
  * Usa o Rng da run (quem chama salva o estado dele depois).
  * Devolve se o andar novo tem Training Room.
  */
@@ -95,16 +114,40 @@ export function enterNextFloor(state: RunState, rng: Rng): boolean {
   const player = getPlayer(state);
   const next = state.floor + 1;
   const floor = generateFloor(rng);
+  const stairsRoom = roomIndexAt(floor.rooms, floor.stairs);
+  const special: number[] = [];
+  const freeRooms = (): number[] =>
+    floor.rooms.map((_, i) => i).filter((i) => i !== floor.startRoom && i !== stairsRoom && !special.includes(i));
 
   let trainingRoom = -1;
   if (state.hero.trainingPending > 0) {
-    const stairsRoom = roomIndexAt(floor.rooms, floor.stairs);
-    const candidates = floor.rooms.map((_, i) => i).filter((i) => i !== floor.startRoom && i !== stairsRoom);
+    const candidates = freeRooms();
     if (candidates.length > 0) {
       trainingRoom = rng.pick(candidates);
+      special.push(trainingRoom);
       setTile(floor.map, roomCenter(floor.rooms[trainingRoom] as Room), TileType.TRAINING);
       state.hero.trainingPending -= 1;
     }
+  }
+
+  state.merchant = null;
+  if (MERCHANT_FLOORS.includes(next)) {
+    const candidates = freeRooms();
+    if (candidates.length > 0) {
+      const merchantRoom = rng.pick(candidates);
+      special.push(merchantRoom);
+      setTile(floor.map, roomCenter(floor.rooms[merchantRoom] as Room), TileType.MERCHANT);
+      state.merchant = rollMerchant(next, state.hero, rng);
+    }
+  }
+
+  const bosses: Entity[] = [];
+  state.hiddenStairs = null;
+  if (next === FINAL_FLOOR && stairsRoom >= 0) {
+    setTile(floor.map, floor.stairs, TileType.FLOOR);
+    state.hiddenStairs = { ...floor.stairs };
+    special.push(stairsRoom);
+    bosses.push(spawnBoss(next, floor.stairs, stairsRoom));
   }
 
   player.pos = { ...floor.start };
@@ -114,8 +157,9 @@ export function enterNextFloor(state: RunState, rng: Rng): boolean {
   state.visitedRooms = [];
   state.clearedRooms = [];
   state.explored = [];
-  state.entities = [player, ...spawnEnemies(next, floor, rng, trainingRoom >= 0 ? [trainingRoom] : [])];
+  state.entities = [player, ...bosses, ...spawnEnemies(next, floor, rng, special)];
   revealAround(state);
+  revealStairsIfWatcher(state);
   return trainingRoom >= 0;
 }
 
@@ -138,6 +182,8 @@ export function createTestRun(seed: number): RunState {
     visitedRooms: [],
     clearedRooms: [],
     explored: [],
+    merchant: null,
+    hiddenStairs: null,
     entities: [knight, goblin],
     playerId: knight.id,
     hero,

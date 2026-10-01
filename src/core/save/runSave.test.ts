@@ -58,7 +58,7 @@ describe('migração do save', () => {
     const v2 = { ...rest, version: 2 };
     const migrated = deserializeRun(JSON.stringify(v2));
     expect(migrated).not.toBeNull();
-    expect(migrated!.version).toBe(5);
+    expect(migrated!.version).toBe(6);
     expect(migrated!.hero.skills).toEqual({ brutalStrike: 1, berserk: 1, whirlwindThrow: 1, woundCleansing: 1 });
     expect(migrated!.hero.equipment).toEqual({ weapon: 'sword' });
     expect(migrated!.clearedRooms).toEqual([]);
@@ -84,7 +84,7 @@ describe('migração v4 → v5', () => {
     const { explored, ...rest } = state;
     const v4 = { ...rest, version: 4 };
     const migrated = deserializeRun(JSON.stringify(v4));
-    expect(migrated!.version).toBe(5);
+    expect(migrated!.version).toBe(6);
     expect(migrated!.explored).toEqual(explored);
     expect(migrated!.hero).toEqual(state.hero);
   });
@@ -92,5 +92,20 @@ describe('migração v4 → v5', () => {
   it('save sem explored válido é rejeitado', () => {
     const broken = { ...createRun(11), explored: 'x' };
     expect(deserializeRun(JSON.stringify(broken))).toBeNull();
+  });
+});
+
+describe('migração v5 → v6', () => {
+  it('ganha relíquias vazias, sem mercador e sem escada escondida, e continua jogável', () => {
+    const state = createRun(21);
+    const { merchant: _m, hiddenStairs: _h, ...rest } = state;
+    const { relics: _r, ...hero } = state.hero;
+    const v5 = { ...rest, hero, version: 5 };
+    const migrated = deserializeRun(JSON.stringify(v5));
+    expect(migrated!.version).toBe(6);
+    expect(migrated!.hero.relics).toEqual([]);
+    expect(migrated!.merchant).toBeNull();
+    expect(migrated!.hiddenStairs).toBeNull();
+    expect(resolvePlayerAction(migrated!, { type: 'wait' }).tookTurn).toBe(true);
   });
 });

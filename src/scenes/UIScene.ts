@@ -11,7 +11,8 @@ import { StatusPanel } from '../view/hud/StatusPanel';
 import { PANEL_H, PANEL_TOP, PANEL_W, RIGHT_X, textStyle } from '../view/hud/ui';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
-const MILESTONE = 'Marco 3';
+const MILESTONE = 'Marco 4';
+const BOSS_BAR_W = 360;
 
 /**
  * HUD por cima do mundo, com câmera própria (não se mexe com a câmera do
@@ -30,6 +31,9 @@ export class UIScene extends Phaser.Scene {
   private overlayTitle!: Phaser.GameObjects.Text;
   private overlaySub!: Phaser.GameObjects.Text;
   private source: InputSource = 'keyboard';
+  private bossBar!: Phaser.GameObjects.Container;
+  private bossName!: Phaser.GameObjects.Text;
+  private bossFill!: Phaser.GameObjects.Rectangle;
 
   constructor() {
     super(SCENE_KEYS.UI);
@@ -52,6 +56,7 @@ export class UIScene extends Phaser.Scene {
     this.minimap = new MiniMap(this, PANEL_TOP + 8);
     this.log = new BattleLog(this, PANEL_TOP + 16 + MiniMap.height, PANEL_TOP + PANEL_H - 8);
 
+    this.createBossBar();
     this.hotbar = new Hotbar(this);
     this.inventory = new InventoryScreen(this);
     this.choice = new ChoiceScreen(this);
@@ -76,6 +81,14 @@ export class UIScene extends Phaser.Scene {
       this.hotbar.update(s.hotbar);
     });
     this.listen('minimap', (m) => this.minimap.update(m));
+    this.listen('boss-status', (b) => {
+      this.bossBar.setVisible(b !== null);
+      this.subtitle.setVisible(b === null);
+      if (!b) return;
+      this.bossName.setText(`${b.name.toUpperCase()}${b.enraged ? '  · ENFURECIDO' : ''}  ${b.hp}/${b.maxHp}`);
+      this.bossFill.width = Math.round(BOSS_BAR_W * Math.max(0, b.hp / b.maxHp));
+      this.bossFill.fillColor = b.enraged ? COLORS.BOSS_ENRAGED : COLORS.BOSS;
+    });
     this.listen('log', ({ lines }) => this.log.push(lines));
     this.listen('input-source', ({ source }) => {
       this.source = source;
@@ -107,6 +120,16 @@ export class UIScene extends Phaser.Scene {
     const events = this.game.events;
     onGameEvent(events, name, handler, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => offGameEvent(events, name, handler, this));
+  }
+
+  /** Barra do boss entre o título e o mapa (no lugar do subtítulo enquanto a luta dura). */
+  private createBossBar(): void {
+    const x = GAME_WIDTH / 2 - BOSS_BAR_W / 2;
+    const y = MAP_VIEW.y - 22;
+    this.bossName = this.add.text(GAME_WIDTH / 2, y - 16, '', textStyle(11, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0);
+    const back = this.add.rectangle(x, y, BOSS_BAR_W, 8, 0x000000).setOrigin(0).setStrokeStyle(1, COLORS.FRAME);
+    this.bossFill = this.add.rectangle(x, y, BOSS_BAR_W, 8, COLORS.BOSS).setOrigin(0);
+    this.bossBar = this.add.container(0, 0, [back, this.bossFill, this.bossName]).setVisible(false);
   }
 
   private createOverlay(): void {

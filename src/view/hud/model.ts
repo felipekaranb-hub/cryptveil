@@ -2,8 +2,10 @@ import type { Action, SkillSlot } from '../../core/actions';
 import { CARDS, type CardId } from '../../core/data/cards';
 import { getItem, type ItemId } from '../../core/data/items';
 import { KNIGHT_HOTBAR, resolveSkill, SKILLS, STARTING_SKILL, skillSummary, type SkillId } from '../../core/data/skills';
+import { RELICS } from '../../core/data/relics';
 import { getTile, TileType } from '../../core/dungeon/DungeonMap';
-import { countInBag, xpToNextLevel, type HeroState } from '../../core/hero';
+import { sellPrice, shopOffers } from '../../core/shop';
+import { countInBag, RELIC_SLOTS, xpToNextLevel, type HeroState } from '../../core/hero';
 import { canEquip, equipmentScore, type EquipmentDef, type EquipSlot } from '../../core/items/Item';
 import { getPlayer, type RunState } from '../../core/run';
 import { roman } from '../format';
@@ -25,8 +27,6 @@ export const GEAR_SLOTS: readonly { readonly slot: EquipSlot; readonly label: st
   { slot: 'boots', label: 'Botas' },
 ];
 
-/** Relíquias chegam no Marco 4; os 3 slots já aparecem vazios. */
-export const RELIC_SLOTS = 3;
 
 export interface GearSlotView {
   readonly slot: EquipSlot;
@@ -85,7 +85,10 @@ export function buildHud(state: RunState): HudSnapshot {
       const id = hero.equipment[slot];
       return { slot, label, item: id ? getItem(id).name : null };
     }),
-    relics: new Array<string | null>(RELIC_SLOTS).fill(null),
+    relics: Array.from({ length: RELIC_SLOTS }, (_, i) => {
+      const id = hero.relics[i];
+      return id ? RELICS[id].name : null;
+    }),
     hotbar: buildHotbar(state),
     deckSize: deckSize(hero),
   };
@@ -135,7 +138,7 @@ function deckSize(hero: HeroState): number {
 // ------------------------------------------------------------------ minimapa
 
 /** Célula do minimapa. 0 = não explorado. */
-export const MiniCell = { UNKNOWN: 0, FLOOR: 1, WALL: 2, STAIRS: 3, TRAINING: 4 } as const;
+export const MiniCell = { UNKNOWN: 0, FLOOR: 1, WALL: 2, STAIRS: 3, TRAINING: 4, MERCHANT: 5 } as const;
 export type MiniCell = (typeof MiniCell)[keyof typeof MiniCell];
 
 export interface MinimapView {
@@ -159,7 +162,9 @@ export function buildMinimap(state: RunState, visible: ReadonlySet<number>): Min
           ? MiniCell.STAIRS
           : tile === TileType.TRAINING
             ? MiniCell.TRAINING
-            : MiniCell.FLOOR;
+            : tile === TileType.MERCHANT
+              ? MiniCell.MERCHANT
+              : MiniCell.FLOOR;
   }
   const enemies = state.entities
     .filter((e) => e.kind === 'enemy' && e.hp > 0 && visible.has(e.pos.y * map.width + e.pos.x))
@@ -192,6 +197,8 @@ export interface InventoryView {
   readonly tabs: readonly string[];
   readonly rows: readonly InventoryRow[];
   readonly selected: number;
+  /** Texto à direita do rodapé (loja: gold do player). */
+  readonly status?: string;
 }
 
 export function buildInventoryRows(state: RunState, tab: number): InventoryRow[] {
@@ -275,19 +282,19 @@ function sellRows(hero: HeroState): InventoryRow[] {
   const rows = grouped(hero.bag)
     .filter(([id]) => {
       const item = getItem(id);
-      return item.kind === 'equipment' && !canEquip(item, hero.vocation);
+      return item.kind === 'material' || (item.kind === 'equipment' && !canEquip(item, hero.vocation));
     })
     .map(([id, count]): InventoryRow => {
       const item = getItem(id);
       return {
         text: `${item.name}${count > 1 ? ` ×${count}` : ''}`,
-        detail: `vale ${item.value}g`,
-        info: 'O Knight não usa. A loja chega no Marco 4.',
+        detail: `vende por ${sellPrice(item, hero.vocation)}g`,
+        info: item.kind === 'material' ? 'Produto de criatura: venda no mercador' : 'O Knight não usa: venda no mercador',
         verb: null,
         action: null,
       };
     });
-  return rows.length > 0 ? rows : [header('Nada pra vender: itens que o Knight não usa vêm pra cá')];
+  return rows.length > 0 ? rows : [header('Nada aqui: produtos de criatura e itens que o Knight não usa vêm pra cá')];
 }
 
 function deckRows(hero: HeroState): InventoryRow[] {
@@ -301,6 +308,11 @@ function deckRows(hero: HeroState): InventoryRow[] {
       verb: null,
       action: null,
     });
+  }
+  rows.push(header('RELÍQUIAS'));
+  if (hero.relics.length === 0) rows.push(header('  (nenhuma: o mercador vende)'));
+  for (const id of hero.relics) {
+    rows.push({ text: RELICS[id].name, detail: '', info: RELICS[id].description, verb: null, action: null });
   }
   rows.push(header('CARTAS'));
   const cards = Object.entries(hero.cards) as [CardId, number][];
@@ -317,4 +329,53 @@ function deckRows(hero: HeroState): InventoryRow[] {
     });
   }
   return rows;
+}
+
+// --------------------------------------------------------------------- loja
+
+export const SHOP_TABS = ['Comprar', 'Vender'] as const;
+
+/** Linhas da loja: aba Comprar (ofertas do mercador) ou Vender (tudo da mochila). */
+export function buildShopRows(state: RunState, tab: number): InventoryRow[] {
+  const { hero } = state;
+  if (tab === 0) {
+    return shopOffers(state).map((offer, index): InventoryRow => {
+      const affordable = hero.gold >= offer.price;
+      if (offer.kind === 'relic') {
+        const relic = RELICS[offer.relicId];
+        return {
+          text: `Relíquia: ${relic.name}`,
+          detail: `${offer.price}g`,
+          info: relic.description,
+          verb: affordable ? 'comprar' : null,
+          action: { type: 'buy', index },
+          ...(affordable ? {} : { tone: 'worse' as const }),
+        };
+      }
+      const item = getItem(offer.itemId);
+      const stats = item.kind === 'equipment' ? `  ${itemStats(item)}` : '';
+      return {
+        text: `${item.name}${offer.stockIndex === null ? '' : ' (1 un.)'}`,
+        detail: `${offer.price}g`,
+        info:
+          item.kind === 'potion'
+            ? `Sempre à venda${stats}`
+            : `${GEAR_SLOTS.find((g) => item.kind === 'equipment' && g.slot === item.slot)?.label ?? ''}${stats}`,
+        verb: affordable ? 'comprar' : null,
+        action: { type: 'buy', index },
+        ...(affordable ? {} : { tone: 'worse' as const }),
+      };
+    });
+  }
+  const rows = grouped(hero.bag).map(([id, count]): InventoryRow => {
+    const item = getItem(id);
+    return {
+      text: `${item.name}${count > 1 ? ` ×${count}` : ''}`,
+      detail: `+${sellPrice(item, hero.vocation)}g`,
+      info: item.kind === 'equipment' ? itemStats(item) : item.kind === 'material' ? 'Produto de criatura' : 'Poção',
+      verb: 'vender 1',
+      action: { type: 'sell', itemId: id },
+    };
+  });
+  return rows.length > 0 ? rows : [header('Mochila vazia (equipado não vende: tire no inventário)')];
 }

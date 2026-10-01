@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 3). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 4). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -44,7 +44,7 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | # | Tema | Decisão |
 |---|---|---|
 | 2.1 | Sorcerer | Staff alcance 3; ataque básico é mágico e ignora shield/defesa pesada. Pós-MVP. |
-| 2.2 | Boss do Floor 5 | **Orc Warlord** (HP ~500, dano 18–30 → ATK 24, convoca 1 Orc a cada 3 turnos, enraged <30% HP = +50% dano). Drops: Crown Helmet OU Magic Sword; sempre Tower Shield; ~50g. Dragon Lord fica pro v1.1. |
+| 2.2 | Boss do Floor 5 | **Orc Warlord** (HP ~500, dano 18–30 → ATK 24, convoca 1 Orc a cada 3 turnos, enraged <30% HP = +50% dano). Drops: Crown Helmet OU Magic Sword; sempre Tower Shield; ~50g. Dragon Lord fica pro v1.1. Implementado no Marco 4 (detalhes na §5). |
 | 2.3 | Monstros do MVP | **Rat, Skeleton, Goblin, Orc.** Dragon volta no v1.1. |
 | 2.4 | Equipamento do Knight | Começa com Sword. Tabela abaixo. |
 | 2.5 | Itens | `equipTags: Vocation[]`. Drop universal, equip restrito (`canEquip` aceita a vocação ou `'ALL'`). Fora da vocação → aba "Pra vender". |
@@ -162,10 +162,11 @@ cryptveil/
     │   ├── hero.ts            # HeroState: mana, XP/level, gold, equipamento, inventário, skills, cartas
     │   ├── cards.ts           # Sorteio de cartas (peso por raridade), aplicar carta, abrir escolha
     │   ├── fog.ts             # Fog of war: tiles visíveis agora e explorados no andar (Marco 3)
+    │   ├── shop.ts            # Mercador: estoque, preços (compra/venda, bônus da vocação), comprar/vender (Marco 4)
     │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
     │   ├── run.ts             # RunState serializável, createRun, enterNextFloor, createTestRun, consultas
-    │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
-    │   ├── data/entities.ts   # Modelos (knight, goblinDummy) com satisfies
+    │   ├── ai/strategies.ts   # AiStrategy: chase e skirmisher (arremessa de longe), registro AI_STRATEGIES (injetado por id)
+    │   ├── data/entities.ts   # Knight, Rat, Goblin, Skeleton, Orc, Orc Warlord (+ goblinDummy dos testes) com satisfies
     │   ├── dungeon/           # DungeonMap, TileType, Room, DungeonGenerator (BSP), populate (monstros)
     │   ├── save/runSave.ts    # RunState ↔ texto, versão e migração (suspender automático)
     │   ├── entities/Entity.ts # Entidade como dado puro
@@ -173,7 +174,7 @@ cryptveil/
     │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
     │   ├── items/             # Item (canEquip), Inventory (auto-equip, equipar/desequipar), LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
-    │   └── data/              # entities, items, lootTables, skills (níveis + hotbar), cards — (M4) relics
+    │   └── data/              # entities, items (+ materiais), lootTables, skills (níveis + hotbar), cards, relics, shop
     ├── input/InputController.ts
     ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
     ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
@@ -256,8 +257,28 @@ HUD inteiro, inventário, minimapa e fog of war. `RunState` v5 (`explored`) com 
 - **Deck na tela** (opção A): aba Deck no inventário + contador "Deck N" no painel (N = cartas escolhidas na run: níveis de skill ganhos em carta + pilhas das passivas).
 - Testado no Chromium: HUD, fog, inventário (equipar/trocar de aba), controle simulado (LB+A soltou o Brutal Strike, RB trocou a aba) e um bot pelas teclas descendo até o andar 5 sem erro no console.
 
-### Marco 4 — Conteúdo MVP
-Rat/Skeleton/Goblin/Orc com loot tables, Merchant Room + loja (venda 30%, compra 100%, +10% em item da vocação), Orc Warlord + Boss Room, 2 relíquias. Checar o risco de DEF da §2.12.
+### ✅ Marco 4 — Conteúdo MVP (entregue em 01/10/2026)
+Monstros reais, loot completo, mercador e loja, Orc Warlord e relíquias. `RunState` v6 (`merchant`, `hiddenStairs`, `hero.relics`, habilidades e recargas nos monstros) com migração do v5. 253 testes.
+Decisões do Felipe (plano com 10 perguntas):
+- **Dificuldade por andar:** monstros com **stats fixos** (um Rat é sempre um Rat). O andar fica mais difícil pela **mistura** e pela **lotação** (`FLOOR_SPAWNS` em `balance.ts`):
+
+  | Andar | Monstros por sala | Mistura (peso) |
+  |---|---|---|
+  | 1 | 0–2 | Rat 60 · Goblin 40 |
+  | 2 | 0–2 | Rat 25 · Goblin 50 · Skeleton 25 |
+  | 3 | 0–3 | Goblin 35 · Skeleton 45 · Orc 20 |
+  | 4 | 1–3 | Skeleton 50 · Orc 50 |
+  | 5 | 1–3 | Skeleton 30 · Orc 70 (+ boss) |
+
+- **Stats (provisórios):** Rat HP 20 / ATK 7 / DEF 0 · Goblin 30/8/1 · Skeleton 44/11/2 · Orc 56/16/3 · Orc Warlord 500/24/4. XP 4/6/9/13/60; gold 1–3, 2–4, 3–6, 4–8, 45–55.
+- **Ataque de longe (misto, decisão do Felipe):** só quem faz sentido arremessa — **Goblin (pedra, alcance 3, ×0,6), Orc (lança, alcance 4, ×0,7), Orc Warlord (facas, alcance 4, ×0,6)**. Em linha reta, sem parede nem ninguém no meio, com **recarga** (3–4 turnos); nos outros turnos o monstro **continua avançando** (ganha turno sem virar kiting, pra classe ranged não ficar forte demais depois). Estratégia `skirmisher`. Rat e Skeleton só perseguem. Na simulação o arremesso não muda a taxa de vitória (é sabor, não muro). Quem arremessa aparece na tela no turno do arremesso mesmo fora da visão, e o projétil é animado.
+- **Produtos de criatura** (só pra vender, tipo `material`): Cheese (Rat 50%), Goblin Ear (35%), Bone (Skeleton 40%), Orc Tooth (35%). Vão pra aba "Pra vender". Equipamento com as chances da §2.4.
+- **Mercador:** uma Merchant Room garantida nos **andares 2 a 5** (sala sem monstros, tile de balcão). Pisar abre a loja; comprar e vender **não gastam turno**; Esc/B sai (I/Y não fecha a loja, pra não sair sem querer). Estoque: **poções sempre** (HP 25g, Mana 18g), **3 equipamentos** sorteados do nível do andar (comprou, acabou) e **1 relíquia** que o player ainda não tem.
+- **Preços:** compra 100% do valor, venda 30%. **Item da vocação** (feito pro Knight, não `ALL`) **vende +10% e compra +10%** (decisão do Felipe: as duas coisas). Todo item vende por ≥ 1g.
+- **Orc Warlord:** fica no lugar da escada do andar 5, sozinho na sala; **a escada só aparece quando ele morre, no tile onde ele caiu** (decidido na implementação: nascer no lugar original deixava a escada às vezes debaixo do Knight, que tinha de sair e voltar). Descer = vitória. Invoca **1 Orc a cada 3 turnos** com o player a até 7 tiles, **máximo 3 vivos**; os invocados rendem **só metade do XP** (sem gold, loot, poção, mana ou cura de kill — não dá pra farmar). Abaixo de 30% **enfurece** (×1,5, corpo vermelho). Drop: Crown Helmet OU Magic Sword, sempre Tower Shield, Plate 40%, Demon Shield 25%. Barra de HP no topo da tela durante a luta.
+- **Relíquias (as 4, decisão do Felipe), compradas no mercador, 3 slots:** Ídolo Dourado (+50% gold por kill, 55g) · Olho do Vigia (visão 4 no corredor e a escada aparece no minimapa ao chegar, 45g) · Pedra de Sangue (kill cura 5% do HP max, 75g) · Totem de Guerra (1º golpe em cada monstro ×2, 85g).
+- **Simulação** (bot agora vende material/equipamento pior, compra relíquia e até 3 poções de HP; 200 seeds): antes do Marco 4 vencia **64%** (sem boss). Agora **vence 41%**; **66% chegam ao boss e 62% deles o derrotam**; mortes por andar 19/9/24/16/50; nível médio 10,4 (8,6 ao chegar no 5); ~119 de gold de kills por run; só 0,3 relíquia por run (o bot gasta pouco; jogador de verdade deve comprar mais — revisar no Marco 6).
+- **Risco da §2.12 apareceu:** DEF média final do Knight 15,2. Skeleton (ATK 11, rolagem 8–14) já dá quase sempre 1 de dano nos andares 4–5, e o Orc (12–20) dá 1–5. Quem ameaça no fim é o volume (salas cheias, arremessos) e o boss (ATK 24, ×1,5 enfurecido). Fica pro Marco 6 decidir: subir ATK dos monstros do fim, ou dano com redução percentual.
 
 ### Marco 5 — Meta-progressão
 GameOverScene, HubScene (Sanctum: The Vault, Ancient Armory, Tome of Knowledge; Shrine of Vocations só pós-MVP), MetaProgress em LocalStorage versionado, Bestiary básico.
@@ -291,11 +312,12 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
     - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
   - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 16 (Marco 2d; era 6 no 2c), o próximo andar ganha uma Training Room.
   - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (no 2b; desde o 2c vem de kill) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
-  - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
+  - [x] Marco 4 (decidido em 01/10/2026, números provisórios): loot tables, stats dos monstros, preços, relíquias (eram 2 no plano; o Felipe quis as 4), mercador e boss. Tudo na §5, Marco 4.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
-- [ ] Empilhamento de DEF (§2.12) — vigiar no Marco 4.
+- [ ] Empilhamento de DEF (§2.12) — **confirmado no Marco 4** (Skeleton dá ~1 de dano no fim): decidir no Marco 6.
+- [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6 (ou no Marco 5, junto com a conversão de gold pra meta).
 
 ---
 

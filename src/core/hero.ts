@@ -1,6 +1,7 @@
 import { KNIGHT_START_MANA, LEVEL_UP_GAIN, XP_CURVE } from './balance';
 import { CARDS, type CardEffect, type CardId } from './data/cards';
 import { getItem, type ItemId } from './data/items';
+import { RELICS, type RelicEffect, type RelicId } from './data/relics';
 import { ENTITY_TEMPLATES } from './data/entities';
 import { STARTING_SKILL, type SkillId } from './data/skills';
 import type { Entity } from './entities/Entity';
@@ -42,6 +43,23 @@ export interface HeroState {
   cards: Partial<Record<CardId, number>>;
   /** Level ups que ainda não escolheram carta (subiu vários níveis de uma vez). */
   pendingCardPicks: number;
+  /** Relíquias (Marco 4), até RELIC_SLOTS. Compradas no mercador. */
+  relics: RelicId[];
+}
+
+/** Slots de relíquia (§2.8). */
+export const RELIC_SLOTS = 3;
+
+/** Efeito da relíquia do tipo pedido, se o herói tem uma. */
+export function relicEffect<T extends RelicEffect['type']>(
+  hero: HeroState,
+  type: T,
+): Extract<RelicEffect, { type: T }> | undefined {
+  for (const id of hero.relics) {
+    const effect: RelicEffect = RELICS[id].effect;
+    if (effect.type === type) return effect as Extract<RelicEffect, { type: T }>;
+  }
+  return undefined;
 }
 
 export function createKnightHero(): HeroState {
@@ -65,6 +83,7 @@ export function createKnightHero(): HeroState {
     skills: { [STARTING_SKILL]: 1 },
     cards: {},
     pendingCardPicks: 0,
+    relics: [],
   };
 }
 

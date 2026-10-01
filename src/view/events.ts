@@ -23,6 +23,8 @@ export interface GameEvents {
   /** Inventário aberto/atualizado (aba, linhas, seleção). */
   'inventory-view': InventoryView;
   'inventory-closed': Record<string, never>;
+  /** Barra do boss (null = esconde). */
+  'boss-status': { name: string; hp: number; maxHp: number; enraged: boolean } | null;
   /** Última origem de input: a UI troca os rótulos (tecla ou botão do controle). */
   'input-source': { source: InputSource };
   /** Escolha aberta/atualizada: cartas do level up ou opções da Training Room. */

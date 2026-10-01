@@ -1,5 +1,6 @@
 import { CORRIDOR_VISION } from './balance';
-import { isWalkable } from './dungeon/DungeonMap';
+import { isWalkable, TileType } from './dungeon/DungeonMap';
+import { relicEffect } from './hero';
 import { roomIndexAt } from './dungeon/Room';
 import { DIRECTIONS, inBounds, step, type Point } from './grid';
 import type { RunState } from './run';
@@ -34,7 +35,9 @@ export function visibleTiles(state: RunState): Set<number> {
   let frontier: Point[] = [player];
   add(player);
   const floor = new Set<number>([player.y * map.width + player.x]);
-  for (let d = 0; d < CORRIDOR_VISION; d++) {
+  // Relíquia Olho do Vigia: enxerga mais longe no corredor
+  const vision = relicEffect(state.hero, 'watcher')?.vision ?? CORRIDOR_VISION;
+  for (let d = 0; d < vision; d++) {
     const next: Point[] = [];
     for (const p of frontier) {
       for (const dir of DIRECTIONS) {
@@ -65,4 +68,21 @@ export function revealAround(state: RunState): void {
 
 export function isExplored(state: RunState, p: Point): boolean {
   return state.explored.includes(p.y * state.map.width + p.x);
+}
+
+/**
+ * Relíquia Olho do Vigia: a escada do andar (ou o lugar dela, no andar do
+ * boss) entra no explorado e aparece no minimapa. Chamado ao chegar no
+ * andar e ao comprar a relíquia.
+ */
+export function revealStairsIfWatcher(state: RunState): void {
+  if (!relicEffect(state.hero, 'watcher')) return;
+  const { map } = state;
+  const stairs = state.hiddenStairs ?? (() => {
+    const i = map.tiles.indexOf(TileType.STAIRS);
+    return i < 0 ? null : { x: i % map.width, y: Math.floor(i / map.width) };
+  })();
+  if (!stairs) return;
+  const key = stairs.y * map.width + stairs.x;
+  if (!state.explored.includes(key)) state.explored = [...state.explored, key].sort((a, b) => a - b);
 }

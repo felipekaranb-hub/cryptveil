@@ -14,7 +14,15 @@ import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
 import { describeCard, describeTraining, formatEvent, formatFailure, type LogLine } from '../view/format';
-import { buildHud, buildInventoryRows, buildMinimap, INVENTORY_TABS, type InventoryRow } from '../view/hud/model';
+import {
+  buildHud,
+  buildInventoryRows,
+  buildMinimap,
+  buildShopRows,
+  INVENTORY_TABS,
+  SHOP_TABS,
+  type InventoryRow,
+} from '../view/hud/model';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 interface GameSceneData {
@@ -33,13 +41,19 @@ export class GameScene extends Phaser.Scene {
    * 'inventory': tela de inventário aberta (I / Y); o mapa não recebe movimento.
    */
   private mode: 'playing' | 'resume-offer' | 'inventory' = 'playing';
-  /** Aba e linha selecionadas no inventário. */
+  /** Painel aberto no modo 'inventory': inventário (I/Y) ou loja do mercador (prompt do core). */
+  private panel: 'inventory' | 'shop' = 'inventory';
+  /** Aba e linha selecionadas no painel. */
   private invTab = 0;
   private invSelected = 0;
   /** Tiles que o Knight vê agora (fog of war); recalculado a cada turno. */
   private visible: ReadonlySet<number> = new Set();
   private fogGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** O boss já apareceu na tela: a barra dele continua mesmo se sair da visão. */
+  private bossSeen = false;
   private inputSource: InputSource = 'keyboard';
+  /** Monstros que arremessaram neste turno: aparecem mesmo fora da visão. */
+  private readonly revealedThisTurn = new Set<string>();
   private readonly views = new Map<string, EntityView>();
   private mapGraphics: Phaser.GameObjects.Graphics | null = null;
   /** Opção destacada na escolha aberta (carta ou Training Room). */
@@ -192,6 +206,14 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(TILE_COLORS.TRAINING_MARK, 1);
           g.fillRect(px + 13, py + 9, 6, 14);
           g.fillRect(px + 9, py + 13, 14, 6);
+        } else if (tile === TileType.MERCHANT) {
+          // Mercador provisório: balcão marrom com moeda dourada
+          g.fillStyle(TILE_COLORS.MERCHANT, 1);
+          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          g.fillStyle(TILE_COLORS.MERCHANT_COIN, 1);
+          g.fillCircle(px + TILE_SIZE / 2, py + TILE_SIZE / 2, 8);
+          g.fillStyle(TILE_COLORS.MERCHANT, 1);
+          g.fillRect(px + TILE_SIZE / 2 - 1, py + 10, 2, 12);
         } else {
           const light = (x + y) % 2 === 0;
           g.fillStyle(light ? TILE_COLORS.FLOOR_LIGHT : TILE_COLORS.FLOOR_DARK, 1);
@@ -226,6 +248,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.state.prompt?.type === 'shop') {
+      // Loja aberta mas painel fechado (não deveria acontecer): reabre
+      this.openPanel('shop');
+      return;
+    }
     if (this.state.prompt) {
       this.handleChoiceInput(action);
       return;
@@ -241,6 +268,12 @@ export class GameScene extends Phaser.Scene {
   /** Manda a ação pro core e anima. Devolve se gastou o turno. */
   private act(action: Action): boolean {
     const result = resolvePlayerAction(this.state, action);
+    if (!result.tookTurn && result.reason === 'free-action') {
+      // Loja: comprar/vender mudam o estado sem gastar turno
+      this.playEvents(result.events);
+      this.refreshView();
+      return false;
+    }
     if (!result.tookTurn) {
       // Parede fica quieta; skill sem mana/alvo avisa no LOG
       const warning = formatFailure(result);
@@ -255,7 +288,13 @@ export class GameScene extends Phaser.Scene {
   // -------------------------------------------------------------- inventário
 
   private openInventory(): void {
+    this.openPanel('inventory');
+  }
+
+  private openPanel(panel: 'inventory' | 'shop'): void {
     this.mode = 'inventory';
+    this.panel = panel;
+    this.invTab = 0;
     this.invSelected = this.firstSelectable(this.inventoryRows(), 0, 1);
     this.emitInventory();
   }
@@ -265,8 +304,12 @@ export class GameScene extends Phaser.Scene {
     emitGameEvent(this.game.events, 'inventory-closed', {});
   }
 
+  private panelTabs(): readonly string[] {
+    return this.panel === 'shop' ? SHOP_TABS : INVENTORY_TABS;
+  }
+
   private inventoryRows(): InventoryRow[] {
-    return buildInventoryRows(this.state, this.invTab);
+    return this.panel === 'shop' ? buildShopRows(this.state, this.invTab) : buildInventoryRows(this.state, this.invTab);
   }
 
   /** Próxima linha selecionável a partir de `from` (pula títulos de seção); -1 se não tem. */
@@ -279,9 +322,10 @@ export class GameScene extends Phaser.Scene {
     const rows = this.inventoryRows();
     emitGameEvent(this.game.events, 'inventory-view', {
       tab: this.invTab,
-      tabs: INVENTORY_TABS,
+      tabs: this.panelTabs(),
       rows,
       selected: this.invSelected,
+      ...(this.panel === 'shop' ? { status: `Seu gold: ${this.state.hero.gold}` } : {}),
     });
   }
 
@@ -311,7 +355,7 @@ export class GameScene extends Phaser.Scene {
         if (!row?.action) return;
         this.act(row.action);
         // Turno passou: level up (contra-ataque matou) ou morte fecham o inventário
-        if (this.state.prompt || this.state.status !== 'playing') {
+        if (this.panel === 'inventory' && (this.state.prompt || this.state.status !== 'playing')) {
           this.closeInventory();
           if (this.state.prompt) this.openChoice();
           return;
@@ -324,6 +368,11 @@ export class GameScene extends Phaser.Scene {
       }
       case 'cancel':
       case 'inventory':
+        if (this.panel === 'shop') {
+          if (action.type === 'inventory') return; // na loja, só Esc/B sai
+          this.act({ type: 'cancel' }); // fecha o prompt no core ('shop-closed' fecha o painel)
+          return;
+        }
         this.closeInventory();
         return;
       default:
@@ -333,7 +382,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private switchTab(delta: number): void {
-    const n = INVENTORY_TABS.length;
+    const n = this.panelTabs().length;
     this.invTab = (this.invTab + delta + n) % n;
     this.invSelected = this.firstSelectable(this.inventoryRows(), 0, 1);
     this.emitInventory();
@@ -357,13 +406,15 @@ export class GameScene extends Phaser.Scene {
   /** Começa (ou retoma) o jogo: some o overlay e reabre uma escolha pendente do save. */
   private startPlaying(): void {
     emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
-    if (this.state.prompt) this.openChoice();
+    if (this.state.prompt?.type === 'shop') this.openPanel('shop');
+    else if (this.state.prompt) this.openChoice();
   }
 
   private choiceOptions(): ReturnType<typeof describeTraining> {
     const prompt = this.state.prompt;
     if (!prompt) return [];
     if (prompt.type === 'training') return describeTraining();
+    if (prompt.type !== 'card') return [];
     return prompt.offer.map((id) => describeCard(id, this.state.hero));
   }
 
@@ -402,6 +453,11 @@ export class GameScene extends Phaser.Scene {
           if (event.entityId === this.state.playerId) this.centerCamera();
           break;
         case 'attacked': {
+          if (event.ranged) {
+            // Quem arremessa aparece neste turno mesmo fora da visão (dá pra saber de onde veio)
+            this.revealedThisTurn.add(event.attackerId);
+            this.throwProjectile(event.attackerId, event.targetId);
+          }
           const target = getEntity(this.state, event.targetId);
           const view = this.views.get(event.targetId);
           if (target && view) {
@@ -439,6 +495,24 @@ export class GameScene extends Phaser.Scene {
         case 'card-offered':
           this.openChoice();
           break;
+        case 'summoned': {
+          const orc = getEntity(this.state, event.entityId);
+          if (orc) this.views.set(orc.id, new EntityView(this, orc));
+          break;
+        }
+        case 'enraged':
+          this.views.get(event.entityId)?.setEnraged();
+          this.cameras.main.shake(120, 0.006);
+          break;
+        case 'stairs-revealed':
+          this.redrawMap();
+          break;
+        case 'shop-opened':
+          this.openPanel('shop');
+          break;
+        case 'shop-closed':
+          this.closeInventory();
+          break;
         case 'trained':
           this.redrawMap(); // o altar vira chão
           emitGameEvent(this.game.events, 'choice-closed', {});
@@ -468,6 +542,8 @@ export class GameScene extends Phaser.Scene {
         case 'rewarded':
         case 'looted':
         case 'room-cleared':
+        case 'bought':
+        case 'sold':
         case 'equipped':
         case 'unequipped':
           break;
@@ -486,10 +562,47 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.state.map;
     for (const entity of this.state.entities) {
       if (entity.kind === 'player') continue;
-      this.views.get(entity.id)?.container.setVisible(this.visible.has(entity.pos.y * width + entity.pos.x));
+      const seen = this.visible.has(entity.pos.y * width + entity.pos.x) || this.revealedThisTurn.has(entity.id);
+      this.views.get(entity.id)?.container.setVisible(seen);
     }
+    this.revealedThisTurn.clear();
+    this.emitBossStatus();
     emitGameEvent(this.game.events, 'hud', buildHud(this.state));
     emitGameEvent(this.game.events, 'minimap', buildMinimap(this.state, this.visible));
+  }
+
+  /** Barra do boss no topo do mapa enquanto ele está vivo e à vista (ou já foi visto lutando). */
+  private emitBossStatus(): void {
+    const boss = this.state.entities.find((e) => e.boss);
+    const { width } = this.state.map;
+    if (boss && boss.hp > 0 && (this.bossSeen || this.visible.has(boss.pos.y * width + boss.pos.x))) {
+      this.bossSeen = true;
+      emitGameEvent(this.game.events, 'boss-status', {
+        name: boss.name,
+        hp: boss.hp,
+        maxHp: boss.maxHp,
+        enraged: boss.enraged === true,
+      });
+    } else {
+      this.bossSeen = false;
+      emitGameEvent(this.game.events, 'boss-status', null);
+    }
+  }
+
+  /** Projétil (pedra, lança, facas): risco rápido do atacante até o alvo. */
+  private throwProjectile(fromId: string, toId: string): void {
+    const from = getEntity(this.state, fromId);
+    const to = getEntity(this.state, toId);
+    if (!from || !to) return;
+    const center = (p: { x: number; y: number }): { x: number; y: number } => ({
+      x: p.x * TILE_SIZE + TILE_SIZE / 2,
+      y: p.y * TILE_SIZE + TILE_SIZE / 2,
+    });
+    const a = center(from.pos);
+    const b = center(to.pos);
+    const dart = this.add.rectangle(a.x, a.y, 8, 3, COLORS.PROJECTILE).setDepth(15);
+    dart.setRotation(Math.atan2(b.y - a.y, b.x - a.x));
+    this.tweens.add({ targets: dart, x: b.x, y: b.y, duration: 140, ease: 'Linear', onComplete: () => dart.destroy() });
   }
 
   /**

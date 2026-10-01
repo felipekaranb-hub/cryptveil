@@ -13,6 +13,8 @@ const VISIBLE_ROWS = Math.floor((LIST_BOTTOM - LIST_TOP) / ROW_H);
 const CONTROLS = {
   keyboard: { pick: '↑/↓ escolher', confirm: 'Enter', rest: 'Q/E ou ←/→: aba  ·  I/Esc: fechar' },
   gamepad: { pick: 'D-pad ↑/↓ escolher', confirm: 'A', rest: 'LB/RB ou ←/→: aba  ·  Y/B: fechar' },
+  shopKeyboard: { pick: '↑/↓ escolher', confirm: 'Enter', rest: 'Q/E ou ←/→: aba  ·  Esc: sair' },
+  shopGamepad: { pick: 'D-pad ↑/↓ escolher', confirm: 'A', rest: 'LB/RB ou ←/→: aba  ·  B: sair' },
 } as const;
 
 /**
@@ -76,10 +78,12 @@ export class InventoryScreen {
 
     // Rodapé: o que a linha selecionada faz + controles
     const sel = view.rows[view.selected];
-    const c = CONTROLS[source];
+    // Na loja, I/Y não fecha (só Esc/B sai, pra não sair sem querer)
+    const c = view.status !== undefined ? CONTROLS[source === 'keyboard' ? 'shopKeyboard' : 'shopGamepad'] : CONTROLS[source];
     const controls = [c.pick, ...(sel?.verb ? [`${c.confirm}: ${sel.verb}`] : []), c.rest].join('  ·  ');
     items.push(
-      s.add.text(left + 16, LIST_BOTTOM + 10, sel && !sel.header ? sel.info : '', { ...textStyle(11, TEXT_COLORS.ACCENT), wordWrap: { width: MAP_VIEW.width - 32 } }),
+      s.add.text(left + 16, LIST_BOTTOM + 10, sel && !sel.header ? sel.info : '', { ...textStyle(11, TEXT_COLORS.ACCENT), wordWrap: { width: MAP_VIEW.width - 150 } }),
+      s.add.text(left + MAP_VIEW.width - 16, LIST_BOTTOM + 10, view.status ?? '', textStyle(11, TEXT_COLORS.ACCENT)).setOrigin(1, 0),
       s.add.text(left + MAP_VIEW.width / 2, MAP_VIEW.y + MAP_VIEW.height - 16, controls, textStyle(10, TEXT_COLORS.MUTED)).setOrigin(0.5),
     );
 

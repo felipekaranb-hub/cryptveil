@@ -28,18 +28,37 @@ export const DUNGEON = {
   maxRoomSize: 10,
 } as const;
 
-/** Monstros por sala (a sala inicial sempre começa vazia). */
-export const ENEMIES_PER_ROOM = { min: 0, max: 2 } as const;
+/**
+ * Marco 4 (decisão do Felipe): monstros com stats fixos; o andar fica mais
+ * difícil pela MISTURA (peso de cada monstro) e pela LOTAÇÃO (monstros por
+ * sala). A sala inicial sempre começa vazia. Índice = andar (1–5).
+ */
+export const FLOOR_SPAWNS: Readonly<
+  Record<number, { readonly perRoom: { readonly min: number; readonly max: number }; readonly weights: Readonly<Partial<Record<'rat' | 'goblin' | 'skeleton' | 'orc', number>>> }>
+> = {
+  1: { perRoom: { min: 0, max: 2 }, weights: { rat: 60, goblin: 40 } },
+  2: { perRoom: { min: 0, max: 2 }, weights: { rat: 25, goblin: 50, skeleton: 25 } },
+  3: { perRoom: { min: 0, max: 3 }, weights: { goblin: 35, skeleton: 45, orc: 20 } },
+  4: { perRoom: { min: 1, max: 3 }, weights: { skeleton: 50, orc: 50 } },
+  5: { perRoom: { min: 1, max: 3 }, weights: { skeleton: 35, orc: 65 } },
+};
+
+// ------------------------------------------------------------ mercador e loja
+
+/** Merchant Room garantida nesses andares (2 a 5: a do 5 prepara pro boss). */
+export const MERCHANT_FLOORS: readonly number[] = [2, 3, 4, 5];
 
 /**
- * PROVISÓRIO (Marco 2): o Goblin dummy cresce por andar só pra testar o loop.
- * Os monstros reais (Rat/Skeleton/Goblin/Orc) com stats próprios chegam no Marco 4.
+ * Loja (§5 Marco 4): compra a 100% do valor, venda a 30%. Item da vocação
+ * (feito pro Knight, não 'ALL') vende por +10% e compra por +10% (decisão
+ * do Felipe: as duas coisas). Estoque: poções sempre, mais 3 equipamentos
+ * do nível do andar e 1 relíquia que o player ainda não tem.
  */
-export const PLACEHOLDER_ENEMY_GROWTH = {
-  hpPerFloor: 10,
-  atkPerFloor: 4,
-  xpPerFloor: 2,
-  goldPerFloor: 1,
+export const SHOP = {
+  buyRate: 1,
+  sellRate: 0.3,
+  vocationBonus: 0.1,
+  equipmentStock: 3,
 } as const;
 
 /** Monstro só persegue quem estiver a até essa distância (Manhattan). */

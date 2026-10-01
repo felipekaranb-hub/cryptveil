@@ -5,8 +5,8 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 
 ## Onde estamos (atualizado em 01/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a (BSP, andares, suspender automático), 2b (Knight: skills, mana, XP, loot, poções, sala de treino), 2c (ajustes de sensação), 2d (level up com cartas) e 3 (UI completa: HUD, paper doll, hotbar com combo LB/RB no controle, inventário com abas Mochila/Pra vender/Deck, minimapa e fog of war). Tudo publicado na `main`.
-- **Próximo:** Marco 4 — conteúdo MVP (Rat/Skeleton/Goblin/Orc com loot tables, Merchant Room + loja, Orc Warlord + Boss Room, 2 relíquias). Apresentar o plano antes; stats dos monstros, preços e relíquias ainda são lacunas (§7).
+- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war) e 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias). Tudo publicado na `main`.
+- **Próximo:** Marco 5 — meta-progressão (GameOverScene, HubScene/Sanctum com The Vault, Ancient Armory e Tome of Knowledge, MetaProgress versionado, Bestiary básico). Apresentar o plano antes; custos/efeitos do Sanctum e a conversão de gold são lacunas (§7).
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)
