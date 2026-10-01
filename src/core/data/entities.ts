@@ -14,7 +14,8 @@ export const ENTITY_TEMPLATES = {
     kind: 'enemy',
     name: 'Goblin',
     glyph: 'G',
-    maxHp: 15,
+    // Marco 2c: HP maior pra +ATK mudar o número de golpes (era 15)
+    maxHp: 24,
     atk: 3,
     def: 1,
     ai: 'chase',

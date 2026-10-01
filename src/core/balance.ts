@@ -36,7 +36,7 @@ export const ENEMIES_PER_ROOM = { min: 0, max: 2 } as const;
  * Os monstros reais (Rat/Skeleton/Goblin/Orc) com stats próprios chegam no Marco 4.
  */
 export const PLACEHOLDER_ENEMY_GROWTH = {
-  hpPerFloor: 5,
+  hpPerFloor: 8,
   atkPerFloor: 3,
   xpPerFloor: 2,
   goldPerFloor: 1,
@@ -50,8 +50,12 @@ export const AGGRO_RANGE = 7;
 /** Mana máxima inicial do Knight (handoff §7, Marco 2). */
 export const KNIGHT_START_MANA = 30;
 
-/** Regenera 1 de mana a cada N turnos. HP não regenera sozinho. */
-export const MANA_REGEN_EVERY_TURNS = 2;
+/**
+ * Mana vem de LUTAR, não de esperar (Marco 2c): cada kill do player rende
+ * isso. Não existe regen por turno — com ele, ficar parado virava mana de
+ * graça e a Wound Cleansing virava HP infinito. HP também não regenera.
+ */
+export const MANA_PER_KILL = 4;
 
 /** XP pro próximo nível = XP_PER_LEVEL × nível atual (20, 40, 60…). */
 export const XP_PER_LEVEL = 20;
@@ -65,12 +69,15 @@ export const KILL_HEAL = 2;
 /**
  * Poções caem de qualquer monstro, sorteio independente do loot.
  * HP: rara (5%, decisão do Felipe) porque é a única cura fora da skill.
- * Mana: mais comum (8%) e mais fraca em valor — a mana já regenera sozinha
- * e 50% da mana inicial (15) paga 1,5 Wound Cleansing ≈ 19 HP, menos que a
- * poção de HP (25 HP no início).
+ * Mana: mais comum (8%) e mais fraca em valor — 50% da mana inicial (15)
+ * paga 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP (25 HP no início).
  */
 export const POTION_DROP_CHANCE = { hpPotion: 0.05, manaPotion: 0.08 } as const;
 
-/** Training Room: a cada N salas exploradas (entrou e matou os monstros dela). */
-export const ROOMS_PER_TRAINING = 5;
+/**
+ * Training Room: a cada N salas exploradas (entrou e matou os monstros dela).
+ * Era 5 (§2.7 original); com 6–12 salas por andar isso dava uma por andar.
+ * 10 → uma a cada 1–2 andares (decisão do Felipe, Marco 2c).
+ */
+export const ROOMS_PER_TRAINING = 10;
 export const TRAINING_BONUS = 2;

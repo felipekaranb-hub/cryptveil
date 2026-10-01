@@ -43,6 +43,12 @@ export function formatEvent(event: CoreEvent, state: RunState): string | null {
       return 'Training Room: escolha +2 ATK ou +2 DEF';
     case 'trained':
       return `Treinou: +${event.amount} ${event.stat.toUpperCase()}`;
+    case 'stats-changed': {
+      const parts: string[] = [];
+      if (event.atk.from !== event.atk.to) parts.push(`ATK ${event.atk.from} → ${event.atk.to}`);
+      if (event.def.from !== event.def.to) parts.push(`DEF ${event.def.from} → ${event.def.to}`);
+      return parts.join('  ');
+    }
     case 'victory':
       return 'Vitória!';
     case 'defeat':

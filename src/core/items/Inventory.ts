@@ -1,7 +1,7 @@
 import { getItem, type ItemId } from '../data/items';
 import type { Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
-import { refreshPlayerStats, type HeroState } from '../hero';
+import { updatePlayerStats, type HeroState } from '../hero';
 import { canEquip, equipmentScore } from './Item';
 
 /**
@@ -18,8 +18,8 @@ export function receiveItem(hero: HeroState, player: Entity, id: ItemId, events:
     if (equipmentScore(item) > currentScore) {
       if (currentId) hero.bag.push(currentId);
       hero.equipment[item.slot] = id;
-      refreshPlayerStats(hero, player);
       events.push({ type: 'looted', itemId: id, equipped: true });
+      updatePlayerStats(hero, player, events);
       return;
     }
   }

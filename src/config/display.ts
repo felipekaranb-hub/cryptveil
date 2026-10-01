@@ -57,6 +57,14 @@ export const TEXT_COLORS = {
   MUTED: '#8a8578',
 } as const;
 
+/** Cores dos números flutuantes. */
+export const POP_COLORS = {
+  DAMAGE_DEALT: '#f4ecd8',
+  DAMAGE_TAKEN: '#e05a4a',
+  HEAL: '#6fcf6f',
+  MANA: '#6fa8e8',
+} as const;
+
 export const FONT_FAMILY = 'monospace';
 
 export const SCENE_KEYS = {

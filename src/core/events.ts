@@ -35,5 +35,11 @@ export type CoreEvent =
   | { readonly type: 'room-cleared'; readonly explored: number; readonly trainingEarned: boolean }
   | { readonly type: 'training-offered' }
   | { readonly type: 'trained'; readonly stat: 'atk' | 'def'; readonly amount: number }
+  /** ATK/DEF efetivos do player mudaram (equipou, treinou): a view mostra "ATK 10 → 16". */
+  | {
+      readonly type: 'stats-changed';
+      readonly atk: { readonly from: number; readonly to: number };
+      readonly def: { readonly from: number; readonly to: number };
+    }
   | { readonly type: 'victory' }
   | { readonly type: 'defeat' };

@@ -3,7 +3,7 @@ import { roomIndexAt } from '../dungeon/Room';
 import { setTile, TileType } from '../dungeon/DungeonMap';
 import { isAlive } from '../entities/Entity';
 import type { CoreEvent } from '../events';
-import { refreshPlayerStats } from '../hero';
+import { updatePlayerStats } from '../hero';
 import { getPlayer, type RunState } from '../run';
 
 /**
@@ -36,9 +36,9 @@ export function applyTrainingChoice(state: RunState, index: number, events: Core
   const stat = index === 0 ? 'atk' : 'def';
   if (stat === 'atk') hero.trainedAtk += TRAINING_BONUS;
   else hero.trainedDef += TRAINING_BONUS;
-  refreshPlayerStats(hero, player);
   setTile(state.map, player.pos, TileType.FLOOR);
   state.prompt = null;
   events.push({ type: 'trained', stat, amount: TRAINING_BONUS });
+  updatePlayerStats(hero, player, events);
   return true;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '../actions';
-import { KILL_HEAL, KNIGHT_START_MANA, ROOMS_PER_TRAINING, TRAINING_BONUS } from '../balance';
+import { KILL_HEAL, KNIGHT_START_MANA, MANA_PER_KILL, ROOMS_PER_TRAINING, TRAINING_BONUS } from '../balance';
 import { damageRange } from '../combat/damage';
 import { ENTITY_TEMPLATES } from '../data/entities';
 import { getTile, setTile, TileType } from '../dungeon/DungeonMap';
@@ -45,8 +45,8 @@ describe('Knight: estado inicial', () => {
 });
 
 describe('skills', () => {
-  it('Brutal Strike: gasta 5 de mana e bate com ATK×1,5', () => {
-    const { min, max } = damageRange(15);
+  it('Brutal Strike: gasta 5 de mana e bate com ATK×2', () => {
+    const { min, max } = damageRange(20);
     for (let seed = 1; seed <= 30; seed++) {
       const state = arena([{ x: 8, y: 5 }], seed);
       state.entities[1]!.hp = 999;
@@ -121,15 +121,34 @@ describe('skills', () => {
     expect(state.hero.mana).toBe(KNIGHT_START_MANA - 10);
   });
 
-  it('mana regenera 1 a cada 2 turnos, sem passar do máximo', () => {
+  it('toda skill de dano bate mais que o golpe básico', () => {
+    for (const slot of [1, 3] as const) {
+      const state = arena([{ x: 8, y: 5 }], 5);
+      state.entities[1]!.hp = 999;
+      const r = resolvePlayerAction(state, skill(slot));
+      // ATK 10: básico rola até 13; ×1,5 começa em 11 e ×2 em 15 (menos DEF 1)
+      expect(attacksBy(r.events, 'player')[0]!.damage).toBeGreaterThanOrEqual(slot === 1 ? 14 : 10);
+    }
+  });
+
+  it('esperar não regenera mana (fim do exploit de cura)', () => {
     const state = arena([]);
     state.hero.mana = 10;
-    for (let i = 0; i < 6; i++) resolvePlayerAction(state, WAIT);
-    expect(state.hero.mana).toBe(13);
-    state.hero.mana = state.hero.maxMana;
-    resolvePlayerAction(state, WAIT);
-    resolvePlayerAction(state, WAIT);
-    expect(state.hero.mana).toBe(state.hero.maxMana);
+    for (let i = 0; i < 20; i++) resolvePlayerAction(state, WAIT);
+    expect(state.hero.mana).toBe(10);
+  });
+
+  it(`kill rende +${MANA_PER_KILL} de mana, sem passar do máximo`, () => {
+    const state = arena([{ x: 8, y: 5 }]);
+    state.entities[1]!.hp = 1;
+    state.hero.mana = 10;
+    const r = resolvePlayerAction(state, { type: 'move', dir: 'E' });
+    expect(r.events).toContainEqual({ type: 'mana-restored', amount: MANA_PER_KILL, mana: 10 + MANA_PER_KILL });
+
+    const full = arena([{ x: 8, y: 5 }]);
+    full.entities[1]!.hp = 1;
+    resolvePlayerAction(full, { type: 'move', dir: 'E' });
+    expect(full.hero.mana).toBe(full.hero.maxMana);
   });
 });
 
@@ -207,8 +226,11 @@ describe('equipamento', () => {
     receiveItem(state.hero, player, 'spikeSword', events);
     expect(state.hero.equipment.weapon).toBe('spikeSword');
     expect(state.hero.bag).toEqual(['sword']);
-    expect(player.atk).toBe(13);
-    expect(events).toEqual([{ type: 'looted', itemId: 'spikeSword', equipped: true }]);
+    expect(player.atk).toBe(15);
+    expect(events).toEqual([
+      { type: 'looted', itemId: 'spikeSword', equipped: true },
+      { type: 'stats-changed', atk: { from: 10, to: 15 }, def: { from: 5, to: 5 } },
+    ]);
 
     // Pior ou igual: inventário
     receiveItem(state.hero, player, 'sword', events);
@@ -217,7 +239,7 @@ describe('equipamento', () => {
 
     // Slot vazio: qualquer armadura veste
     receiveItem(state.hero, player, 'leatherArmor', events);
-    expect(player.def).toBe(6);
+    expect(player.def).toBe(7);
   });
 
   it('canEquip respeita a vocação ou ALL', async () => {
@@ -275,7 +297,14 @@ describe('salas exploradas e Training Room', () => {
 
     const turn = state.turn;
     const c = resolvePlayerAction(state, { type: 'choose', index: 1 });
-    expect(c).toEqual({ tookTurn: false, reason: 'free-action', events: [{ type: 'trained', stat: 'def', amount: TRAINING_BONUS }] });
+    expect(c).toEqual({
+      tookTurn: false,
+      reason: 'free-action',
+      events: [
+        { type: 'trained', stat: 'def', amount: TRAINING_BONUS },
+        { type: 'stats-changed', atk: { from: 10, to: 10 }, def: { from: 5, to: 5 + TRAINING_BONUS } },
+      ],
+    });
     expect(getPlayer(state).def).toBe(5 + TRAINING_BONUS);
     expect(state.turn).toBe(turn);
     expect(state.prompt).toBeNull();

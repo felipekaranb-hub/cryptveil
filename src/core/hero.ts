@@ -72,6 +72,16 @@ export function refreshPlayerStats(hero: HeroState, player: Entity): void {
   player.def = def;
 }
 
+/** refreshPlayerStats + evento 'stats-changed' se ATK ou DEF mudaram. */
+export function updatePlayerStats(hero: HeroState, player: Entity, events: CoreEvent[]): void {
+  const atk = player.atk;
+  const def = player.def;
+  refreshPlayerStats(hero, player);
+  if (player.atk !== atk || player.def !== def) {
+    events.push({ type: 'stats-changed', atk: { from: atk, to: player.atk }, def: { from: def, to: player.def } });
+  }
+}
+
 export function xpToNextLevel(level: number): number {
   return XP_PER_LEVEL * level;
 }

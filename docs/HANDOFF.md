@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 2b). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 2c). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -35,7 +35,7 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | 2.4 | Equipamento do Knight | Começa com Sword. Tabela abaixo. |
 | 2.5 | Itens | `equipTags: Vocation[]`. Drop universal, equip restrito (`canEquip` aceita a vocação ou `'ALL'`). Fora da vocação → aba "Pra vender". |
 | 2.6 | Stats | Só **ATK** e **DEF**. Skills usam o mesmo ATK. |
-| 2.7 | Training Room | A cada 5 salas exploradas, o próximo andar gera 1 Training Room: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. Level up dá só +10 HP max e +10 Mana max. |
+| 2.7 | Training Room | A cada **10** salas exploradas (era 5; mudou no Marco 2c), o próximo andar gera 1 Training Room: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. Level up dá só +10 HP max e +10 Mana max. |
 | 2.8 | Slots | Paper doll de 8 (Helmet, Amulet, Armor, Ring, Weapon, Shield, Legs, Boots) + 3 de relíquia. |
 | 2.9 | Flags especiais | Minotaur: 1 ação/turno. Vampire: cura 50% do dano causado. Ghost: `ignoresWalls` no pathfinding, mas não termina movimento em parede. |
 | 2.10 | Ações | Bater em parede não gasta turno. Bump ataca só o tile da direção. Berserk ataca os 4 adjacentes. |
@@ -151,6 +151,7 @@ cryptveil/
     │   ├── dungeon/           # DungeonMap, TileType, Room, DungeonGenerator (BSP), populate (monstros)
     │   ├── save/runSave.ts    # RunState ↔ texto, versão e migração (suspender automático)
     │   ├── entities/Entity.ts # Entidade como dado puro
+    │   ├── sim/               # Simulação headless de balanceamento (bot fixo + resumo)
     │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
     │   ├── items/             # Item (canEquip), Inventory (auto-equip), LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
@@ -201,6 +202,17 @@ Decisões tomadas (além das da §7):
 - Goblin provisório agora +3 ATK por andar (era +2), + XP, gold e loot por andar (`placeholderFloor1..3`, usando as chances da §2.4 dos monstros que vão morar ali).
 - **Simulação headless** (bot simples: luta com o que encontra, cura abaixo de 50%, poção abaixo de 30%, 60 seeds): vence 27%, 32% morrem no andar 1, nível médio 2,6, DEF média 7,7. Base pro balanceamento do Marco 6.
 
+#### ✅ Marco 2c — Ajustes de sensação (entregue em 01/10/2026)
+Feedback do Felipe jogando o 2b: cura + regen de mana era exploit; Training Room demais; equipamento e treino não se sentiam; skills batiam igual ao golpe básico; drop alto.
+- **Mana só de lutar:** sem regen por turno; **+4 de mana por kill** (`MANA_PER_KILL`), além de poção e level up. Esperar não rende nada.
+- **Training Room a cada 10 salas** (~1 a cada 1–2 andares; §2.7 atualizada).
+- **Skills:** Brutal Strike ×2,0 · Berserk ×1,25 em cada alvo · Whirlwind Throw ×1,5. Custos iguais.
+- **Golpes por kill importam:** Goblin provisório com 24 HP base +8 por andar (era 15 +5); itens com bônus maiores (Spike Sword +8, Magic Sword +15; armaduras 2/4/7, elmos 1/3/5, escudos 2/4/7).
+- **Feedback visual:** número de dano/cura/mana flutuando em cima da entidade (antecipado do Marco 6) e LOG com "ATK 10 → 15" ao equipar ou treinar. Tremidinha só quando o player leva ≥ 20% do HP max.
+- **Drop:** fica como está (provisório; revisar no Marco 4/6).
+- **Simulador headless** em `src/core/sim/` (`SIM=200 npx vitest run src/core/sim`). Mesma régua (bot fixo), 100 seeds: vence **44%**, 3,6 golpes por kill (era 1,8), mortes concentradas nos andares 4–5, nível médio 4, ATK/DEF finais médios 13,8 / 12,6, ~22 skills por run.
+- O "ATK 20 batendo 10" relatado não é bug: com ATK 20 o golpe básico no Goblin dá no mínimo 14. Provavelmente era o Goblin batendo no Knight (o LOG confundia; os números flutuantes resolvem).
+
 ### Marco 3 — UI completa
 HUD (HP/Mana, stats, equipamento de 8 slots + 3 relíquias), BattleLog lendo os eventos do core, hotbar 1–8 (**+ mapeamento no controle**), InventoryUI (Equipado/Pra vender), MiniMap + fog of war (`Set` de `pointKey` por andar).
 
@@ -232,13 +244,13 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 
 - **Lacunas de design (GDD perdido) — decidir no marco indicado:**
   - [x] Marco 2 (decidido em 01/10/2026, números provisórios; balancear depois):
-    - **Skills do Knight**, sem cooldown, só mana: **Brutal Strike** (1 alvo adjacente, ATK×1,5, 5 mana) · **Berserk** (4 adjacentes, ATK×1,0, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,0, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana).
-    - **Mana:** 30 max no início, regenera 1 a cada 2 turnos. HP não regenera sozinho (só passiva +2 por kill e cura).
+    - **Skills do Knight**, sem cooldown, só mana (multiplicadores do Marco 2c): **Brutal Strike** (1 alvo adjacente, ATK×2, 5 mana) · **Berserk** (4 adjacentes, ATK×1,25, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,5, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana).
+    - **Mana:** 30 max no início. ~~Regenera 1 a cada 2 turnos~~ → desde o Marco 2c, +4 por kill (sem regen por turno). HP não regenera sozinho (só passiva +2 por kill e cura).
     - **XP:** o próximo nível custa `20 × nível atual` (20, 40, 60…). XP de cada monstro no template.
     - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.
     - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
-  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 5, o próximo andar ganha uma Training Room.
-  - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (1 a cada 2 turnos ≈ 70 por andar) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
+  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 10 (Marco 2c), o próximo andar ganha uma Training Room.
+  - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (no 2b; desde o 2c vem de kill) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).

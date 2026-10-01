@@ -1,4 +1,4 @@
-import { KILL_HEAL, POTION_DROP_CHANCE } from '../balance';
+import { KILL_HEAL, MANA_PER_KILL, POTION_DROP_CHANCE } from '../balance';
 import type { ItemId } from '../data/items';
 import { LOOT_TABLES } from '../data/lootTables';
 import type { Entity } from '../entities/Entity';
@@ -11,7 +11,7 @@ import { getPlayer, type RunState } from '../run';
 
 /**
  * Tudo que um kill do player rende ("grind com retorno real", handoff §6):
- * gold + XP, passiva do Knight (+2 HP), loot da tabela do monstro e poções.
+ * gold + XP, mana, passiva do Knight (+2 HP), loot da tabela do monstro e poções.
  * Loot vai direto pro inventário (sem item no chão no MVP).
  */
 export function grantKillRewards(state: RunState, victim: Entity, rng: Rng, events: CoreEvent[]): void {
@@ -23,6 +23,12 @@ export function grantKillRewards(state: RunState, victim: Entity, rng: Rng, even
     hero.gold += gold;
     events.push({ type: 'rewarded', xp: victim.reward.xp, gold });
     gainXp(hero, player, victim.reward.xp, events);
+  }
+
+  const manaBefore = hero.mana;
+  hero.mana = Math.min(hero.maxMana, hero.mana + MANA_PER_KILL);
+  if (hero.mana > manaBefore) {
+    events.push({ type: 'mana-restored', amount: hero.mana - manaBefore, mana: hero.mana });
   }
 
   const healed = healEntity(player, KILL_HEAL);

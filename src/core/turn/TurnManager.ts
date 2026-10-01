@@ -1,6 +1,6 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
-import { FINAL_FLOOR, MANA_REGEN_EVERY_TURNS } from '../balance';
+import { FINAL_FLOOR } from '../balance';
 import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
 import { isAlive, type Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
@@ -100,9 +100,6 @@ export function resolvePlayerAction(
   }
 
   state.turn += 1;
-  if (state.turn % MANA_REGEN_EVERY_TURNS === 0) {
-    state.hero.mana = Math.min(state.hero.maxMana, state.hero.mana + 1);
-  }
   state.rngState = rng.getState();
   return { tookTurn: true, events };
 }

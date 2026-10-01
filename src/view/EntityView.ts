@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { Entity } from '../core/entities/Entity';
 import type { Point } from '../core/grid';
 import { COLORS, FONT_FAMILY, TILE_SIZE } from '../config/display';
+import { getRenderScale } from './scaling';
 
 const BODY_SIZE = TILE_SIZE - 6;
 const BAR_W = TILE_SIZE - 6;
@@ -57,6 +58,38 @@ export class EntityView {
     const ratio = maxHp > 0 ? Math.max(0, hp / maxHp) : 0;
     this.hpFill.width = Math.round(BAR_W * ratio);
     this.hpFill.fillColor = ratio > 0.5 ? COLORS.HP_GREEN : ratio > 0.25 ? COLORS.HP_YELLOW : COLORS.HP_RED;
+  }
+
+  /**
+   * Número flutuante saindo de cima da entidade (dano, cura). `delayMs`
+   * escalona vários números no mesmo turno pra não ficarem empilhados.
+   */
+  popText(text: string, color: string, delayMs = 0): void {
+    const x = this.container.x;
+    const y = this.container.y - TILE_SIZE / 2;
+    const label = this.scene.add
+      .text(x, y, text, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color,
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(20)
+      .setAlpha(0)
+      // Criado depois do create(): precisa da resolução atual (handoff §4.4)
+      .setResolution(getRenderScale());
+    this.scene.tweens.add({
+      targets: label,
+      delay: delayMs,
+      y: y - 20,
+      alpha: { from: 1, to: 0 },
+      duration: 700,
+      ease: 'Quad.easeOut',
+      onComplete: () => label.destroy(),
+    });
   }
 
   /** Pisca verde ao curar. */

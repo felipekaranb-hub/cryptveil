@@ -8,7 +8,7 @@ import { countInBag, xpToNextLevel } from '../core/hero';
 import { randomSeed } from '../core/rng';
 import { createRun, getEntity, getPlayer, type RunState } from '../core/run';
 import { resolvePlayerAction } from '../core/turn/TurnManager';
-import { COLORS, MAP_VIEW, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
+import { COLORS, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
 import { InputController } from '../input/InputController';
 import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { worldToTile } from '../view/coords';
@@ -246,6 +246,13 @@ export class GameScene extends Phaser.Scene {
   /** Aplica os eventos do core na tela, na ordem. */
   private playEvents(events: readonly CoreEvent[]): void {
     const lines: string[] = [];
+    // Vários números na mesma entidade no mesmo turno saem um depois do outro
+    const pops = new Map<string, number>();
+    const pop = (entityId: string, text: string, color: string): void => {
+      const n = pops.get(entityId) ?? 0;
+      pops.set(entityId, n + 1);
+      this.views.get(entityId)?.popText(text, color, n * 140);
+    };
     for (const event of events) {
       const line = formatEvent(event, this.state);
       if (line) lines.push(line);
@@ -262,7 +269,10 @@ export class GameScene extends Phaser.Scene {
             view.setHp(event.targetHp, target.maxHp);
             view.flash();
           }
-          if (event.damage >= 8) this.cameras.main.shake(80, 0.004);
+          const onPlayer = event.targetId === this.state.playerId;
+          pop(event.targetId, `-${event.damage}`, onPlayer ? POP_COLORS.DAMAGE_TAKEN : POP_COLORS.DAMAGE_DEALT);
+          // Tremidinha só quando o player leva um golpe pesado (≥ 20% do HP max)
+          if (onPlayer && target && event.damage >= target.maxHp * 0.2) this.cameras.main.shake(80, 0.004);
           break;
         }
         case 'died':
@@ -271,6 +281,10 @@ export class GameScene extends Phaser.Scene {
         case 'healed':
           this.views.get(event.entityId)?.setHp(event.hp, getEntity(this.state, event.entityId)?.maxHp ?? event.hp);
           if (event.source !== 'passive') this.views.get(event.entityId)?.flashHeal();
+          pop(event.entityId, `+${event.amount}`, POP_COLORS.HEAL);
+          break;
+        case 'mana-restored':
+          pop(this.state.playerId, `+${event.amount}`, POP_COLORS.MANA);
           break;
         case 'leveled-up': {
           const p = getPlayer(this.state);
@@ -302,7 +316,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'waited':
         case 'skill-used':
-        case 'mana-restored':
+        case 'stats-changed':
         case 'rewarded':
         case 'looted':
         case 'room-cleared':

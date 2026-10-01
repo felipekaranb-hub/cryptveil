@@ -51,7 +51,7 @@ export class UIScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, 22, 'CRYPTVEIL', style(28, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0);
     this.subtitle = this.add
-      .text(GAME_WIDTH / 2, 56, 'Marco 2b', style(12, TEXT_COLORS.MUTED))
+      .text(GAME_WIDTH / 2, 56, 'Marco 2c', style(12, TEXT_COLORS.MUTED))
       .setOrigin(0.5, 0);
 
     // --- painel esquerdo: status do Knight
@@ -148,12 +148,12 @@ export class UIScene extends Phaser.Scene {
   // ------------------------------------------------------------------ eventos
 
   private onRunStarted({ seed }: GameEvents['run-started']): void {
-    this.subtitle.setText(`Marco 2b  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2c  ·  seed ${seed}`);
     this.overlay.setVisible(false);
   }
 
   private onResumeOffered({ seed, floor, turn }: GameEvents['resume-offered']): void {
-    this.subtitle.setText(`Marco 2b  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2c  ·  seed ${seed}`);
     this.overlayTitle.setText('RUN SUSPENSA').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
     this.overlaySub.setText(
       `Andar ${floor}  ·  turno ${turn}\n\nEnter / A: continuar\nEsc / B: nova run`,

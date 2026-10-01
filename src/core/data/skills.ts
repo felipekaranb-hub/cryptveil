@@ -21,9 +21,10 @@ export type SkillDef =
   | { readonly kind: 'heal'; readonly name: string; readonly manaCost: number; readonly healPct: number };
 
 export const SKILLS = {
-  brutalStrike: { kind: 'strike', name: 'Brutal Strike', manaCost: 5, multiplier: 1.5 },
-  berserk: { kind: 'area', name: 'Berserk', manaCost: 10, multiplier: 1 },
-  whirlwindThrow: { kind: 'ranged', name: 'Whirlwind Throw', manaCost: 8, multiplier: 1, range: 3 },
+  // Marco 2c: toda skill de dano tem que valer mais que um golpe básico
+  brutalStrike: { kind: 'strike', name: 'Brutal Strike', manaCost: 5, multiplier: 2 },
+  berserk: { kind: 'area', name: 'Berserk', manaCost: 10, multiplier: 1.25 },
+  whirlwindThrow: { kind: 'ranged', name: 'Whirlwind Throw', manaCost: 8, multiplier: 1.5, range: 3 },
   woundCleansing: { kind: 'heal', name: 'Wound Cleansing', manaCost: 10, healPct: 0.25 },
 } as const satisfies Record<string, SkillDef>;
 
