@@ -39,6 +39,8 @@ SIM=100 npx vitest run src/core/sim --silent=false   # simulação headless de b
 - **Não use `pkill -f "vite ..."` no mesmo comando de outras coisas:** o padrão casa com a própria linha de comando e mata tudo.
 - Save da run tem `version` + migração (`core/save/runSave.ts`): mudou o formato do `RunState`, suba a versão e escreva a migração com teste.
 - **Testar o controle sem controle:** no `addInitScript`, troque `navigator.getGamepads` por um pad falso (`mapping: 'standard'`, botões 0–3 = A/B/X/Y, 4/5 = LB/RB) e dispare `gamepadconnected`. O `timestamp` do pad tem que ser **maior** que o `performance.now()` da criação, senão o Phaser ignora os botões.
+- **Andar do boss (5):** não existe escada até o Orc Warlord morrer (`state.hiddenStairs` marca o andar; a escada nasce onde ele cai). Helper de teste ou bot que "anda até a escada" tem que mirar no boss enquanto ele vive, e escolher a carta do level up que o kill dele abre.
+- **Bot de teste no navegador "travado" quase sempre é o bot**, não o jogo: monstro parado num corredor de 1 tile bloqueia o caminho "livre", ou um prompt (carta/loja) ficou aberto. Antes de caçar bug, leia `state.status`, `state.prompt` e `scene.mode`.
 - Debug no navegador (só no dev): `window.__game.scene.getScene('game').state` é o `RunState` vivo; módulos do core dá pra importar com `await import('/src/core/...ts')`.
 
 ## Regras de arquitetura (verificadas por teste)
