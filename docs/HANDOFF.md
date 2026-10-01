@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 2d). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 3). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -115,12 +115,14 @@ O core recebe `Action` (`src/core/actions.ts`), nunca tecla. `InputController` t
 |---|---|---|
 | Mover / atacar (bump) | WASD / Setas | D-pad / analógico esquerdo |
 | Passar o turno | Espaço | X |
-| Skills 1–8 | 1–8 | **a decidir no Marco 3** (ex.: LB/RB + botões) |
+| Hotbar 1–4 (skills) | 1–4 | **segurar LB** + A / B / X / Y (Marco 3) |
+| Hotbar 5–8 (poções; 7–8 reservados) | 5–8 | **segurar RB** + A / B / X / Y (Marco 3) |
 | Inventário | I | Y |
+| Trocar aba (inventário) | Q / E (ou ←/→) | LB / RB sozinhos (ou ←/→) |
 | Confirmar (e nova run no fim) | Enter | A |
 | Cancelar | Esc | B |
 
-Repetição de movimento: 130 ms (constantes no `InputController`). **Toque na tela fica pós-MVP.**
+Repetição de movimento: 130 ms (constantes no `InputController`). Com um ombro segurado, os botões de face viram hotbar e não fazem a ação normal. A hotbar e a linha de ajuda mostram a tecla ou o combo conforme o **último input usado**. **Toque na tela fica pós-MVP.**
 
 ### 4.4 Tela
 
@@ -159,6 +161,7 @@ cryptveil/
     │   ├── events.ts          # CoreEvent (combate, descended, skill-used, healed, rewarded, looted, room-cleared, trained…)
     │   ├── hero.ts            # HeroState: mana, XP/level, gold, equipamento, inventário, skills, cartas
     │   ├── cards.ts           # Sorteio de cartas (peso por raridade), aplicar carta, abrir escolha
+    │   ├── fog.ts             # Fog of war: tiles visíveis agora e explorados no andar (Marco 3)
     │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
     │   ├── run.ts             # RunState serializável, createRun, enterNextFloor, createTestRun, consultas
     │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
@@ -168,13 +171,14 @@ cryptveil/
     │   ├── entities/Entity.ts # Entidade como dado puro
     │   ├── sim/               # Simulação headless de balanceamento (bot fixo + resumo)
     │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
-    │   ├── items/             # Item (canEquip), Inventory (auto-equip), LootTable
+    │   ├── items/             # Item (canEquip), Inventory (auto-equip, equipar/desequipar), LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
     │   └── data/              # entities, items, lootTables, skills (níveis + hotbar), cards — (M4) relics
     ├── input/InputController.ts
     ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
     ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
-    └── view/                  # coords (tile↔pixel), scaling, events, (M1+) renderers de entidade
+    └── view/                  # coords (tile↔pixel), scaling, events, format (LOG), EntityView
+        └── hud/               # model (RunState → dados do HUD), StatusPanel, Hotbar, BattleLog, MiniMap, InventoryScreen, ChoiceScreen
 ```
 
 ---
@@ -241,8 +245,16 @@ Pedido do Felipe: sentir progressão de roguelike deckbuilder a cada nível. Mod
 - `RunState` v4 (`hero.skills`, `hero.cards`, `hero.pendingCardPicks`, prompt como objeto) com migração do v3 (Knight antigo mantém as 4 skills).
 - **Simulação** (100 seeds, bot com prioridade fixa de cartas): vence 64%, ~8,4 cartas por run, nível médio 9,4, mortes espalhadas pelos andares. Sem boss ainda: o Orc Warlord (Marco 4) é quem deve segurar o fim da região.
 
-### Marco 3 — UI completa
-HUD (HP/Mana, stats, equipamento de 8 slots + 3 relíquias), BattleLog lendo os eventos do core, hotbar 1–8 (**+ mapeamento no controle**), InventoryUI (Equipado/Pra vender), MiniMap + fog of war (`Set` de `pointKey` por andar).
+### ✅ Marco 3 — UI completa (entregue em 01/10/2026)
+HUD inteiro, inventário, minimapa e fog of war. `RunState` v5 (`explored`) com migração do v4. 227 testes.
+- **Layout:** painel esquerdo = Knight (HP/Mana/XP, ATK/DEF, gold, andar, turno, tamanho do deck, **paper doll de 8 slots** estilo Tibia com siglas até os sprites, **3 relíquias** vazias até o Marco 4). Painel direito = **minimapa** em cima e **LOG colorido** embaixo (dano levado em vermelho, cura verde, mana azul, loot dourado, nível lilás). Embaixo = **hotbar de 8 caixas** (tecla/combo, nome, nível, custo; apagada se travada, custo vermelho sem mana ou sem poção) e a linha de ajuda.
+- A UIScene não lê o `RunState`: a GameScene monta modelos (`view/hud/model.ts`) e manda por evento (`hud`, `minimap`, `inventory-view`, `input-source`).
+- **Skills no controle** (decisão do Felipe, opção A): combo de ombro. Segurar LB + A/B/X/Y = slots 1–4, RB + A/B/X/Y = 5–8 (§4.3). Funciona num bartop de 6–8 botões sem menu.
+- **Fog of war** (opção A): dentro de uma sala vê a sala inteira e o anel de parede (portas); no corredor vê até **2 tiles andando pelo chão** (`CORRIDOR_VISION`, não atravessa parede). Explorado fora de vista fica escurecido; nunca visto fica preto. **Monstro só aparece onde o Knight vê agora.** O explorado é só do andar atual (array de índices `y*width+x` no save) e zera ao descer. A fog é só apresentação: IA e combate não olham pra ela, então a simulação não muda.
+- **Inventário** (I / Y), por cima do mapa (painéis laterais continuam à vista), 3 abas: **Mochila** (equipado + itens usáveis, com ↑/↓ comparando com o slot), **Pra vender** (`canEquip` falso, §2.5; venda no Marco 4) e **Deck** (skills com nível e custo, cartas com pilhas). Abrir e navegar é grátis; **equipar, tirar ou usar poção gasta 1 turno** (opção A). Ações novas no core: `equip`, `unequip`, `use-item`.
+- **Auto-equip continua** (opção A): item melhor que o do slot veste sozinho; o inventário serve pra desfazer/trocar.
+- **Deck na tela** (opção A): aba Deck no inventário + contador "Deck N" no painel (N = cartas escolhidas na run: níveis de skill ganhos em carta + pilhas das passivas).
+- Testado no Chromium: HUD, fog, inventário (equipar/trocar de aba), controle simulado (LB+A soltou o Brutal Strike, RB trocou a aba) e um bot pelas teclas descendo até o andar 5 sem erro no console.
 
 ### Marco 4 — Conteúdo MVP
 Rat/Skeleton/Goblin/Orc com loot tables, Merchant Room + loja (venda 30%, compra 100%, +10% em item da vocação), Orc Warlord + Boss Room, 2 relíquias. Checar o risco de DEF da §2.12.
@@ -282,7 +294,7 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).
-- [ ] Mapeamento das skills no controle (Marco 3).
+- [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
 - [ ] Empilhamento de DEF (§2.12) — vigiar no Marco 4.
 
 ---

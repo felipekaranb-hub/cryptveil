@@ -90,3 +90,12 @@ export const POTION_DROP_CHANCE = { hpPotion: 0.05, manaPotion: 0.08 } as const;
  */
 export const ROOMS_PER_TRAINING = 16;
 export const TRAINING_BONUS = 2;
+
+// ------------------------------------------------------------ fog of war
+
+/**
+ * Visão (Marco 3): dentro de uma sala o Knight vê a sala inteira (com as
+ * paredes e as portas). No corredor, vê até essa distância andando pelo chão
+ * (não enxerga através de parede).
+ */
+export const CORRIDOR_VISION = 2;

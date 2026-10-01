@@ -1,76 +1,92 @@
 import { TRAINING_BONUS } from '../core/balance';
 import { CARDS, type CardId } from '../core/data/cards';
 import { getItem } from '../core/data/items';
-import { KNIGHT_HOTBAR, resolveSkill, SKILLS, skillSummary } from '../core/data/skills';
-import { countInBag, type HeroState } from '../core/hero';
+import { resolveSkill, SKILLS, skillSummary } from '../core/data/skills';
+import type { HeroState } from '../core/hero';
 import type { CoreEvent } from '../core/events';
 import { getEntity, type RunState } from '../core/run';
 import type { TurnResult } from '../core/turn/TurnManager';
 import type { ChoiceOption } from './events';
 
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'] as const;
-const roman = (n: number): string => ROMAN[n] ?? String(n);
+export const roman = (n: number): string => ROMAN[n] ?? String(n);
+
+/** Tom da linha do LOG: vira cor na UIScene (LOG_TONE_COLORS). */
+export type LogTone = 'normal' | 'muted' | 'danger' | 'good' | 'mana' | 'loot' | 'level';
+
+export interface LogLine {
+  readonly text: string;
+  readonly tone: LogTone;
+}
 
 /**
- * Texto do LOG de combate a partir dos eventos do core.
+ * Linha do LOG de combate a partir de um evento do core.
  * Fica na view porque é apresentação (idioma, tom); o core só diz o que houve.
  */
-export function formatEvent(event: CoreEvent, state: RunState): string | null {
+export function formatEvent(event: CoreEvent, state: RunState): LogLine | null {
   const name = (id: string): string => getEntity(state, id)?.name ?? id;
+  const line = (text: string, tone: LogTone = 'normal'): LogLine => ({ text, tone });
   switch (event.type) {
     case 'attacked':
-      return `${name(event.attackerId)} acerta ${name(event.targetId)}: ${event.damage}${event.critical ? ' (crítico!)' : ''}`;
+      return line(
+        `${name(event.attackerId)} acerta ${name(event.targetId)}: ${event.damage}${event.critical ? ' (crítico!)' : ''}`,
+        event.targetId === state.playerId ? 'danger' : 'normal',
+      );
     case 'countered':
-      return 'Contra-ataque!';
+      return line('Contra-ataque!');
     case 'died':
-      return `${name(event.entityId)} morreu`;
+      return event.entityId === state.playerId ? line('Você caiu.', 'danger') : line(`${name(event.entityId)} morreu`, 'good');
     case 'waited':
-      return `${name(event.entityId)} espera`;
+      return line(`${name(event.entityId)} espera`, 'muted');
     case 'descended':
       return event.hasTraining
-        ? `Andar ${event.floor}: tem uma Training Room aqui!`
-        : `Você desce ao andar ${event.floor}`;
+        ? line(`Andar ${event.floor}: tem uma Training Room aqui!`, 'level')
+        : line(`Você desce ao andar ${event.floor}`, 'level');
     case 'skill-used':
-      return `${name(event.entityId)} usa ${SKILLS[event.skillId].name}`;
+      return line(`${name(event.entityId)} usa ${SKILLS[event.skillId].name}`);
     case 'healed':
-      if (event.source === 'passive') return `+${event.amount} HP (kill)`;
-      if (event.source === 'vampirism') return `+${event.amount} HP (vampirismo)`;
-      return `Recupera ${event.amount} HP`;
+      if (event.source === 'passive') return line(`+${event.amount} HP (kill)`, 'good');
+      if (event.source === 'vampirism') return line(`+${event.amount} HP (vampirismo)`, 'good');
+      return line(`Recupera ${event.amount} HP`, 'good');
     case 'mana-restored':
-      return `Recupera ${event.amount} de mana`;
+      return line(`Recupera ${event.amount} de mana`, 'mana');
     case 'rewarded':
-      return `+${event.xp} XP  +${event.gold} gold`;
+      return line(`+${event.xp} XP  +${event.gold} gold`, 'loot');
     case 'leveled-up':
-      return `Subiu para o nível ${event.level}!`;
+      return line(`Subiu para o nível ${event.level}!`, 'level');
     case 'looted':
-      return event.equipped ? `Equipou ${getItem(event.itemId).name}` : `Pegou ${getItem(event.itemId).name}`;
+      return line(event.equipped ? `Equipou ${getItem(event.itemId).name}` : `Pegou ${getItem(event.itemId).name}`, 'loot');
+    case 'equipped':
+      return line(`Equipou ${getItem(event.itemId).name}`, 'loot');
+    case 'unequipped':
+      return line(`Guardou ${getItem(event.itemId).name} na mochila`, 'muted');
     case 'room-cleared':
       // Sem contador: a regra da sala de treino é implícita (decisão do Felipe, Marco 2d)
-      return 'Sala explorada';
+      return line('Sala explorada', 'muted');
     case 'training-offered':
-      return 'Training Room: escolha +2 ATK ou +2 DEF';
+      return line('Training Room: escolha +2 ATK ou +2 DEF', 'level');
     case 'trained':
-      return `Treinou: +${event.amount} ${event.stat.toUpperCase()}`;
+      return line(`Treinou: +${event.amount} ${event.stat.toUpperCase()}`, 'level');
     case 'card-offered':
-      return 'Subiu de nível: escolha uma carta';
+      return line('Subiu de nível: escolha uma carta', 'level');
     case 'card-picked': {
       const card = CARDS[event.cardId];
       if (card.kind === 'skill') {
         const skillName = SKILLS[card.skillId].name;
-        return event.level === 1 ? `Nova skill: ${skillName}` : `${skillName} ${roman(event.level)}`;
+        return line(event.level === 1 ? `Nova skill: ${skillName}` : `${skillName} ${roman(event.level)}`, 'level');
       }
-      return card.maxStacks > 1 ? `Carta: ${card.name} (${event.level}/${card.maxStacks})` : `Carta: ${card.name}`;
+      return line(card.maxStacks > 1 ? `Carta: ${card.name} (${event.level}/${card.maxStacks})` : `Carta: ${card.name}`, 'level');
     }
     case 'stats-changed': {
       const parts: string[] = [];
       if (event.atk.from !== event.atk.to) parts.push(`ATK ${event.atk.from} → ${event.atk.to}`);
       if (event.def.from !== event.def.to) parts.push(`DEF ${event.def.from} → ${event.def.to}`);
-      return parts.join('  ');
+      return line(parts.join('  '), 'level');
     }
     case 'victory':
-      return 'Vitória!';
+      return line('Vitória!', 'level');
     case 'defeat':
-      return 'Você morreu.';
+      return line('Você morreu.', 'danger');
     case 'moved':
       return null; // andar não polui o log
   }
@@ -91,7 +107,11 @@ export function formatFailure(result: TurnResult): string | null {
     case 'full-mana':
       return 'Mana já está cheia';
     case 'no-item':
-      return 'Você não tem essa poção';
+      return 'Você não tem esse item';
+    case 'cannot-equip':
+      return 'O Knight não usa esse item';
+    case 'empty-slot':
+      return 'Não tem nada nesse slot';
     default:
       return null;
   }
@@ -120,32 +140,11 @@ export function describeCard(id: CardId, hero: HeroState): ChoiceOption {
   };
 }
 
-const RARITY_LABEL = { common: 'Comum', rare: 'Rara', epic: 'Épica' } as const;
+export const RARITY_LABEL = { common: 'Comum', rare: 'Rara', epic: 'Épica' } as const;
 
 export function describeTraining(): ChoiceOption[] {
   return [
     { title: `+${TRAINING_BONUS} ATK`, subtitle: 'Training Room', description: 'Permanente nesta run', rarity: 'training' },
     { title: `+${TRAINING_BONUS} DEF`, subtitle: 'Training Room', description: 'Permanente nesta run', rarity: 'training' },
   ];
-}
-
-/** Linha da hotbar: skill liberada com nível e custo; slot travado vira "—". */
-export function formatHotbar(hero: HeroState): string {
-  const parts: string[] = [];
-  for (const [slot, entry] of Object.entries(KNIGHT_HOTBAR)) {
-    if (!entry) continue;
-    if (entry.type === 'skill') {
-      const level = hero.skills[entry.id];
-      if (!level) {
-        parts.push(`${slot} —`);
-        continue;
-      }
-      const lv = level > 1 ? ` ${roman(level)}` : '';
-      parts.push(`${slot} ${SKILLS[entry.id].name}${lv} (${resolveSkill(entry.id, level).manaCost})`);
-    } else {
-      const label = entry.id === 'hpPotion' ? 'Poção HP' : 'Poção Mana';
-      parts.push(`${slot} ${label} ×${countInBag(hero, entry.id)}`);
-    }
-  }
-  return parts.join('  ·  ');
 }

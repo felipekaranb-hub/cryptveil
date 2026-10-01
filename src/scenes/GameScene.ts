@@ -2,19 +2,19 @@ import Phaser from 'phaser';
 import type { Action } from '../core/actions';
 import { getTile, TileType } from '../core/dungeon/DungeonMap';
 import type { CoreEvent } from '../core/events';
-import { getItem, type ItemId } from '../core/data/items';
+import { visibleTiles } from '../core/fog';
 import { DIRECTIONS, inBounds, step } from '../core/grid';
-import { countInBag, xpToNextLevel } from '../core/hero';
 import { randomSeed } from '../core/rng';
 import { createRun, getEntity, getPlayer, type RunState } from '../core/run';
 import { resolvePlayerAction } from '../core/turn/TurnManager';
-import { COLORS, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
-import { InputController } from '../input/InputController';
+import { COLORS, FOG, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
+import { InputController, type InputSource } from '../input/InputController';
 import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
-import { describeCard, describeTraining, formatEvent, formatFailure, formatHotbar } from '../view/format';
+import { describeCard, describeTraining, formatEvent, formatFailure, type LogLine } from '../view/format';
+import { buildHud, buildInventoryRows, buildMinimap, INVENTORY_TABS, type InventoryRow } from '../view/hud/model';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 interface GameSceneData {
@@ -28,8 +28,18 @@ interface GameSceneData {
  */
 export class GameScene extends Phaser.Scene {
   private state!: RunState;
-  /** 'resume-offer': achou run suspensa e espera Continuar/Nova run. */
-  private mode: 'playing' | 'resume-offer' = 'playing';
+  /**
+   * 'resume-offer': achou run suspensa e espera Continuar/Nova run.
+   * 'inventory': tela de inventário aberta (I / Y); o mapa não recebe movimento.
+   */
+  private mode: 'playing' | 'resume-offer' | 'inventory' = 'playing';
+  /** Aba e linha selecionadas no inventário. */
+  private invTab = 0;
+  private invSelected = 0;
+  /** Tiles que o Knight vê agora (fog of war); recalculado a cada turno. */
+  private visible: ReadonlySet<number> = new Set();
+  private fogGraphics: Phaser.GameObjects.Graphics | null = null;
+  private inputSource: InputSource = 'keyboard';
   private readonly views = new Map<string, EntityView>();
   private mapGraphics: Phaser.GameObjects.Graphics | null = null;
   /** Opção destacada na escolha aberta (carta ou Training Room). */
@@ -53,7 +63,10 @@ export class GameScene extends Phaser.Scene {
     this.state = suspended ?? createRun(data.seed ?? urlSeed ?? randomSeed());
     this.views.clear();
     this.mapGraphics = null;
+    this.fogGraphics = null;
     this.choice = 0;
+    this.invTab = 0;
+    this.invSelected = 0;
   }
 
   create(): void {
@@ -71,7 +84,13 @@ export class GameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.handlePointer, this);
 
     this.controls = new InputController(this);
-    this.controls.onAction((action) => this.handleAction(action));
+    this.controls.onAction((action, source) => {
+      if (source !== this.inputSource) {
+        this.inputSource = source;
+        emitGameEvent(this.game.events, 'input-source', { source });
+      }
+      this.handleAction(action);
+    });
 
     // Câmera e textos acompanham a resolução real da tela
     bindRenderScale(this, (scale) => {
@@ -94,7 +113,7 @@ export class GameScene extends Phaser.Scene {
       const { seed, floor, turn } = this.state;
       if (this.mode === 'resume-offer') emitGameEvent(this.game.events, 'resume-offered', { seed, floor, turn });
       else this.startPlaying();
-      this.emitPlayerStatus();
+      this.refreshView();
     });
   }
 
@@ -115,6 +134,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.clickMarker.setVisible(false);
     this.centerCamera();
+    this.refreshView();
   }
 
   /**
@@ -185,6 +205,10 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------------- turno
 
   private handleAction(action: Action): void {
+    if (this.mode === 'inventory') {
+      this.handleInventoryInput(action);
+      return;
+    }
     if (this.mode === 'resume-offer') {
       if (action.type === 'confirm') {
         this.mode = 'playing';
@@ -207,16 +231,112 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (action.type === 'inventory') {
+      this.openInventory();
+      return;
+    }
+    this.act(action);
+  }
+
+  /** Manda a ação pro core e anima. Devolve se gastou o turno. */
+  private act(action: Action): boolean {
     const result = resolvePlayerAction(this.state, action);
     if (!result.tookTurn) {
       // Parede fica quieta; skill sem mana/alvo avisa no LOG
       const warning = formatFailure(result);
-      if (warning) emitGameEvent(this.game.events, 'log', { lines: [warning] });
-      return;
+      if (warning) emitGameEvent(this.game.events, 'log', { lines: [{ text: warning, tone: 'muted' }] });
+      return false;
     }
-
     this.playEvents(result.events);
-    this.emitPlayerStatus();
+    this.refreshView();
+    return true;
+  }
+
+  // -------------------------------------------------------------- inventário
+
+  private openInventory(): void {
+    this.mode = 'inventory';
+    this.invSelected = this.firstSelectable(this.inventoryRows(), 0, 1);
+    this.emitInventory();
+  }
+
+  private closeInventory(): void {
+    this.mode = 'playing';
+    emitGameEvent(this.game.events, 'inventory-closed', {});
+  }
+
+  private inventoryRows(): InventoryRow[] {
+    return buildInventoryRows(this.state, this.invTab);
+  }
+
+  /** Próxima linha selecionável a partir de `from` (pula títulos de seção); -1 se não tem. */
+  private firstSelectable(rows: readonly InventoryRow[], from: number, dir: 1 | -1): number {
+    for (let i = from; i >= 0 && i < rows.length; i += dir) if (!rows[i]?.header) return i;
+    return -1;
+  }
+
+  private emitInventory(): void {
+    const rows = this.inventoryRows();
+    emitGameEvent(this.game.events, 'inventory-view', {
+      tab: this.invTab,
+      tabs: INVENTORY_TABS,
+      rows,
+      selected: this.invSelected,
+    });
+  }
+
+  /**
+   * ↑/↓ escolhe a linha, ←/→ ou Q/E (LB/RB) troca a aba, Enter/A faz o que a
+   * linha diz (equipar, tirar, usar — gasta o turno), Esc/B ou I/Y fecha.
+   */
+  private handleInventoryInput(action: Action): void {
+    const rows = this.inventoryRows();
+    switch (action.type) {
+      case 'move': {
+        if (action.dir === 'N' || action.dir === 'S') {
+          const dir = action.dir === 'N' ? -1 : 1;
+          const next = this.firstSelectable(rows, this.invSelected + dir, dir);
+          if (next >= 0) this.invSelected = next;
+        } else {
+          this.switchTab(action.dir === 'W' ? -1 : 1);
+          return;
+        }
+        break;
+      }
+      case 'page':
+        this.switchTab(action.delta);
+        return;
+      case 'confirm': {
+        const row = rows[this.invSelected];
+        if (!row?.action) return;
+        this.act(row.action);
+        // Turno passou: level up (contra-ataque matou) ou morte fecham o inventário
+        if (this.state.prompt || this.state.status !== 'playing') {
+          this.closeInventory();
+          if (this.state.prompt) this.openChoice();
+          return;
+        }
+        const after = this.inventoryRows();
+        // Fica na mesma altura da lista; se ela encolheu, sobe até uma linha válida
+        this.invSelected = this.firstSelectable(after, Math.min(this.invSelected, after.length - 1), -1);
+        if (this.invSelected < 0) this.invSelected = this.firstSelectable(after, 0, 1);
+        break;
+      }
+      case 'cancel':
+      case 'inventory':
+        this.closeInventory();
+        return;
+      default:
+        return;
+    }
+    this.emitInventory();
+  }
+
+  private switchTab(delta: number): void {
+    const n = INVENTORY_TABS.length;
+    this.invTab = (this.invTab + delta + n) % n;
+    this.invSelected = this.firstSelectable(this.inventoryRows(), 0, 1);
+    this.emitInventory();
   }
 
   /** Escolha (carta/Training Room): ←/→ escolhe, Enter/A confirma. O core só recebe a escolha final. */
@@ -231,7 +351,7 @@ export class GameScene extends Phaser.Scene {
     if (action.type !== 'confirm') return;
     const result = resolvePlayerAction(this.state, { type: 'choose', index: this.choice });
     this.playEvents(result.events);
-    this.emitPlayerStatus();
+    this.refreshView();
   }
 
   /** Começa (ou retoma) o jogo: some o overlay e reabre uma escolha pendente do save. */
@@ -264,7 +384,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Aplica os eventos do core na tela, na ordem. */
   private playEvents(events: readonly CoreEvent[]): void {
-    const lines: string[] = [];
+    const lines: LogLine[] = [];
     // Vários números na mesma entidade no mesmo turno saem um depois do outro
     const pops = new Map<string, number>();
     const pop = (entityId: string, text: string, color: string): void => {
@@ -348,38 +468,46 @@ export class GameScene extends Phaser.Scene {
         case 'rewarded':
         case 'looted':
         case 'room-cleared':
+        case 'equipped':
+        case 'unequipped':
           break;
       }
     }
     if (lines.length > 0) emitGameEvent(this.game.events, 'log', { lines });
   }
 
-  private emitPlayerStatus(): void {
-    const p = getPlayer(this.state);
-    const { hero } = this.state;
-    const itemName = (id: ItemId | undefined): string => (id ? getItem(id).name : '—');
-    emitGameEvent(this.game.events, 'player-status', {
-      hp: p.hp,
-      maxHp: p.maxHp,
-      mana: hero.mana,
-      maxMana: hero.maxMana,
-      atk: p.atk,
-      def: p.def,
-      level: hero.level,
-      xp: hero.xp,
-      xpNext: xpToNextLevel(hero.level),
-      gold: hero.gold,
-      turn: this.state.turn,
-      floor: this.state.floor,
-      potions: { hp: countInBag(hero, 'hpPotion'), mana: countInBag(hero, 'manaPotion') },
-      hotbar: formatHotbar(hero),
-      gear: {
-        weapon: itemName(hero.equipment.weapon),
-        armor: itemName(hero.equipment.armor),
-        helmet: itemName(hero.equipment.helmet),
-        shield: itemName(hero.equipment.shield),
-      },
-    });
+  /**
+   * Depois de cada turno: recalcula a fog, esconde monstros fora de vista e
+   * manda HUD + minimapa pra UIScene.
+   */
+  private refreshView(): void {
+    this.visible = visibleTiles(this.state);
+    this.drawFog();
+    const { width } = this.state.map;
+    for (const entity of this.state.entities) {
+      if (entity.kind === 'player') continue;
+      this.views.get(entity.id)?.container.setVisible(this.visible.has(entity.pos.y * width + entity.pos.x));
+    }
+    emitGameEvent(this.game.events, 'hud', buildHud(this.state));
+    emitGameEvent(this.game.events, 'minimap', buildMinimap(this.state, this.visible));
+  }
+
+  /**
+   * Fog of war por cima do mapa: tile nunca visto fica da cor do fundo;
+   * explorado fora de vista fica escurecido (memória do andar).
+   */
+  private drawFog(): void {
+    const { map } = this.state;
+    const explored = new Set(this.state.explored);
+    const g = this.fogGraphics ?? this.add.graphics().setDepth(-0.5);
+    this.fogGraphics = g;
+    g.clear();
+    for (let i = 0; i < map.width * map.height; i++) {
+      if (this.visible.has(i)) continue;
+      const seen = explored.has(i);
+      g.fillStyle(FOG.UNSEEN, seen ? FOG.REMEMBERED_ALPHA : 1);
+      g.fillRect((i % map.width) * TILE_SIZE, Math.floor(i / map.width) * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    }
   }
 
   private restartRun(): void {

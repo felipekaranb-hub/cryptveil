@@ -1,4 +1,6 @@
+import type { ItemId } from './data/items';
 import type { Direction } from './grid';
+import type { EquipSlot } from './items/Item';
 
 /**
  * Intenções do jogador. É isso que o core recebe — nunca tecla, botão ou toque.
@@ -14,6 +16,12 @@ export type Action =
   | { readonly type: 'inventory' }
   /** Escolha num prompt do core (Training Room: 0 = +ATK, 1 = +DEF). */
   | { readonly type: 'choose'; readonly index: number }
+  /** Inventário (Marco 3): vestir item da mochila, tirar do slot, usar poção. Gastam turno. */
+  | { readonly type: 'equip'; readonly itemId: ItemId }
+  | { readonly type: 'unequip'; readonly slot: EquipSlot }
+  | { readonly type: 'use-item'; readonly itemId: ItemId }
+  /** Trocar de página/aba (Q/E, LB/RB). Só a view usa; o core ignora. */
+  | { readonly type: 'page'; readonly delta: -1 | 1 }
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' };
 
@@ -29,6 +37,14 @@ export function describeAction(a: Action): string {
       return 'inventory';
     case 'choose':
       return `choose ${a.index}`;
+    case 'equip':
+      return `equip ${a.itemId}`;
+    case 'unequip':
+      return `unequip ${a.slot}`;
+    case 'use-item':
+      return `use ${a.itemId}`;
+    case 'page':
+      return `page ${a.delta}`;
     case 'confirm':
       return 'confirm';
     case 'cancel':

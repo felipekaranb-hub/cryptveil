@@ -5,8 +5,8 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 
 ## Onde estamos (atualizado em 01/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a (BSP, andares, suspender automático), 2b (Knight: skills, mana, XP, loot, poções, sala de treino), 2c (ajustes de sensação: mana por kill, números flutuantes) e 2d (level up com cartas). Tudo publicado na `main`.
-- **Próximo:** Marco 3 — UI completa (HUD, hotbar com mapeamento no controle, InventoryUI, minimapa + fog of war). Agora também precisa mostrar o **deck de cartas** da run. Apresentar o plano antes.
+- **Entregues:** Marcos 0, 1, 2a (BSP, andares, suspender automático), 2b (Knight: skills, mana, XP, loot, poções, sala de treino), 2c (ajustes de sensação), 2d (level up com cartas) e 3 (UI completa: HUD, paper doll, hotbar com combo LB/RB no controle, inventário com abas Mochila/Pra vender/Deck, minimapa e fog of war). Tudo publicado na `main`.
+- **Próximo:** Marco 4 — conteúdo MVP (Rat/Skeleton/Goblin/Orc com loot tables, Merchant Room + loja, Orc Warlord + Boss Room, 2 relíquias). Apresentar o plano antes; stats dos monstros, preços e relíquias ainda são lacunas (§7).
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)
@@ -38,6 +38,8 @@ SIM=100 npx vitest run src/core/sim --silent=false   # simulação headless de b
 - **Testar no navegador:** Chromium + Playwright já instalados (`require('/opt/node22/lib/node_modules/playwright')`). Pra pular direto pra uma situação, gere um save pelo core (`serializeRun`) e injete com `page.addInitScript` em `localStorage['cryptveil.run']` antes de abrir a página — `page.reload()` não serve, porque o `visibilitychange` da página antiga salva por cima. Teclas: `keyboard.down` + espera ~50 ms + `up` (o input é lido por frame).
 - **Não use `pkill -f "vite ..."` no mesmo comando de outras coisas:** o padrão casa com a própria linha de comando e mata tudo.
 - Save da run tem `version` + migração (`core/save/runSave.ts`): mudou o formato do `RunState`, suba a versão e escreva a migração com teste.
+- **Testar o controle sem controle:** no `addInitScript`, troque `navigator.getGamepads` por um pad falso (`mapping: 'standard'`, botões 0–3 = A/B/X/Y, 4/5 = LB/RB) e dispare `gamepadconnected`. O `timestamp` do pad tem que ser **maior** que o `performance.now()` da criação, senão o Phaser ignora os botões.
+- Debug no navegador (só no dev): `window.__game.scene.getScene('game').state` é o `RunState` vivo; módulos do core dá pra importar com `await import('/src/core/...ts')`.
 
 ## Regras de arquitetura (verificadas por teste)
 

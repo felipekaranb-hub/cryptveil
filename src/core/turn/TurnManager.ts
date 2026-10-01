@@ -4,16 +4,18 @@ import { applyCard, openCardPromptIfPending } from '../cards';
 import { FINAL_FLOOR } from '../balance';
 import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
 import { isAlive, type Entity } from '../entities/Entity';
+import { revealAround } from '../fog';
+import { equipFromBag, unequipSlot, type EquipFailure } from '../items/Inventory';
 import type { CoreEvent } from '../events';
 import { step, type Direction } from '../grid';
 import { Rng } from '../rng';
 import { enterNextFloor, entityAt, getPlayer, livingEnemies, type RunState } from '../run';
 import { attack } from './combat';
 import { applyTrainingChoice, updateRoomProgress } from './rooms';
-import { useHotbarSlot, type HotbarFailure } from './skills';
+import { useHotbarSlot, usePotion, type HotbarFailure } from './skills';
 
 /** Por que a ação não gastou turno. */
-export type TurnFailure = 'wall' | 'not-playing' | 'awaiting-choice' | HotbarFailure;
+export type TurnFailure = 'wall' | 'not-playing' | 'awaiting-choice' | HotbarFailure | EquipFailure | 'empty-slot';
 
 /**
  * Resultado de uma ação do jogador (discriminated union).
@@ -78,8 +80,24 @@ export function resolvePlayerAction(
       if (used !== true) return fail(used);
       break;
     }
+    // Inventário (Marco 3): trocar equipamento ou tomar poção gasta o turno
+    case 'equip': {
+      const done = equipFromBag(state.hero, player, action.itemId, events);
+      if (done !== true) return fail(done);
+      break;
+    }
+    case 'unequip': {
+      const done = unequipSlot(state.hero, player, action.slot, events);
+      if (done !== true) return fail(done);
+      break;
+    }
+    case 'use-item': {
+      const used = usePotion(state, action.itemId, events);
+      if (used !== true) return fail(used);
+      break;
+    }
     default:
-      // Inventário etc. chegam no Marco 3
+      // Abrir inventário, trocar aba etc. são da view
       return fail('not-a-turn-action');
   }
 
@@ -113,6 +131,7 @@ export function resolvePlayerAction(
 
   // Level up neste turno: abre a escolha de carta (depois da Training Room, se as duas)
   openCardPromptIfPending(state, rng, events);
+  revealAround(state);
   state.turn += 1;
   state.rngState = rng.getState();
   return { tookTurn: true, events };

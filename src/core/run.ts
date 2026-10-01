@@ -6,6 +6,7 @@ import { roomCenter, roomIndexAt, type Room } from './dungeon/Room';
 import { createEntity, isAlive, type Entity } from './entities/Entity';
 import { samePoint, type Point } from './grid';
 import { createKnightHero, refreshPlayerStats, type HeroState } from './hero';
+import { revealAround } from './fog';
 import { Rng, type RngState } from './rng';
 
 export type RunStatus = 'playing' | 'won' | 'lost';
@@ -16,8 +17,9 @@ import type { CardId } from './data/cards';
  * Versão do formato do RunState (e do save da run).
  * 2: andares (Marco 2a). 3: herói, salas exploradas e prompt (Marco 2b).
  * 4: cartas e skills por nível; prompt vira objeto (Marco 2d).
+ * 5: fog of war, tiles explorados do andar (Marco 3).
  */
-export const RUN_STATE_VERSION = 4;
+export const RUN_STATE_VERSION = 5;
 
 /** Escolha pendente que trava o turno até o player responder. */
 export type RunPrompt = { readonly type: 'training' } | { readonly type: 'card'; readonly offer: readonly CardId[] };
@@ -39,6 +41,8 @@ export interface RunState {
   /** Salas do andar em que o player já entrou / que já contaram como exploradas. */
   visitedRooms: number[];
   clearedRooms: number[];
+  /** Fog of war: tiles do andar já vistos (índice y * width + x, ordenado). */
+  explored: number[];
   entities: Entity[];
   readonly playerId: string;
   hero: HeroState;
@@ -59,7 +63,7 @@ export function createRun(seed: number): RunState {
   const floor = generateFloor(rng);
   const { knight, hero } = createKnight(floor.start);
   const enemies = spawnEnemies(1, floor, rng);
-  return {
+  const state: RunState = {
     version: RUN_STATE_VERSION,
     seed,
     rngState: rng.getState(),
@@ -70,11 +74,14 @@ export function createRun(seed: number): RunState {
     rooms: floor.rooms,
     visitedRooms: [],
     clearedRooms: [],
+    explored: [],
     entities: [knight, ...enemies],
     playerId: knight.id,
     hero,
     prompt: null,
   };
+  revealAround(state);
+  return state;
 }
 
 /**
@@ -106,7 +113,9 @@ export function enterNextFloor(state: RunState, rng: Rng): boolean {
   state.rooms = floor.rooms;
   state.visitedRooms = [];
   state.clearedRooms = [];
+  state.explored = [];
   state.entities = [player, ...spawnEnemies(next, floor, rng, trainingRoom >= 0 ? [trainingRoom] : [])];
+  revealAround(state);
   return trainingRoom >= 0;
 }
 
@@ -117,7 +126,7 @@ export function createTestRun(seed: number): RunState {
   const { knight, hero } = createKnight({ x: 3, y: 5 });
   const goblin = createEntity('goblin-1', ENTITY_TEMPLATES.goblinDummy, { x: 11, y: 5 });
   goblin.homeRoom = 0;
-  return {
+  const state: RunState = {
     version: RUN_STATE_VERSION,
     seed,
     rngState: Rng.fromSeed(seed).getState(),
@@ -128,11 +137,14 @@ export function createTestRun(seed: number): RunState {
     rooms: [{ x: 1, y: 1, w: TEST_ROOM.width - 2, h: TEST_ROOM.height - 2 }],
     visitedRooms: [],
     clearedRooms: [],
+    explored: [],
     entities: [knight, goblin],
     playerId: knight.id,
     hero,
     prompt: null,
   };
+  revealAround(state);
+  return state;
 }
 
 export function getPlayer(state: RunState): Entity {

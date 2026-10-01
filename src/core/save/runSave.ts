@@ -1,3 +1,4 @@
+import { revealAround } from '../fog';
 import { createKnightHero } from '../hero';
 import { RUN_STATE_VERSION, type RunState } from '../run';
 
@@ -19,6 +20,8 @@ export function serializeRun(state: RunState): string {
  * Monstros já vivos no andar não dão XP/loot; os dos próximos andares, sim.
  * v3 (Marco 2b) → v4: prompt vira objeto; o Knight do v3 tinha as 4 skills,
  * então mantém todas no nível 1; sem cartas.
+ * v4 (Marco 2d) → v5: fog of war; o andar começa sem nada explorado e o
+ * deserializeRun revela o que o Knight vê de onde está.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
@@ -39,6 +42,7 @@ const MIGRATIONS: Readonly<Record<number, Migration>> = {
       },
     };
   },
+  4: (old) => ({ ...old, version: 5, explored: [] }),
 };
 
 /**
@@ -61,7 +65,10 @@ export function deserializeRun(raw: string): RunState | null {
     current = migrate ? migrate(current) : null;
   }
   if (!current || !looksLikeRun(current)) return null;
-  return current.status === 'playing' ? current : null;
+  if (current.status !== 'playing') return null;
+  // Idempotente: num save atual não muda nada; num migrado, revela a sala atual
+  revealAround(current);
+  return current;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -77,6 +84,9 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   if (typeof map['width'] !== 'number' || typeof map['height'] !== 'number') return false;
   if (!Array.isArray(map['tiles']) || map['tiles'].length !== map['width'] * map['height']) return false;
   if (!Array.isArray(v['rooms']) || !Array.isArray(v['visitedRooms']) || !Array.isArray(v['clearedRooms'])) {
+    return false;
+  }
+  if (!Array.isArray(v['explored']) || !v['explored'].every((k) => typeof k === 'number')) {
     return false;
   }
   const hero = v['hero'];

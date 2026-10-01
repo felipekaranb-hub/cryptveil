@@ -58,7 +58,7 @@ describe('migração do save', () => {
     const v2 = { ...rest, version: 2 };
     const migrated = deserializeRun(JSON.stringify(v2));
     expect(migrated).not.toBeNull();
-    expect(migrated!.version).toBe(4);
+    expect(migrated!.version).toBe(5);
     expect(migrated!.hero.skills).toEqual({ brutalStrike: 1, berserk: 1, whirlwindThrow: 1, woundCleansing: 1 });
     expect(migrated!.hero.equipment).toEqual({ weapon: 'sword' });
     expect(migrated!.clearedRooms).toEqual([]);
@@ -75,5 +75,22 @@ describe('migração v3 → v4', () => {
     expect(migrated!.prompt).toEqual({ type: 'training' });
     expect(migrated!.hero.cards).toEqual({});
     expect(migrated!.hero.skills.woundCleansing).toBe(1);
+  });
+});
+
+describe('migração v4 → v5', () => {
+  it('ganha a fog of war com a sala atual revelada e continua idêntica no resto', () => {
+    const state = createRun(11);
+    const { explored, ...rest } = state;
+    const v4 = { ...rest, version: 4 };
+    const migrated = deserializeRun(JSON.stringify(v4));
+    expect(migrated!.version).toBe(5);
+    expect(migrated!.explored).toEqual(explored);
+    expect(migrated!.hero).toEqual(state.hero);
+  });
+
+  it('save sem explored válido é rejeitado', () => {
+    const broken = { ...createRun(11), explored: 'x' };
+    expect(deserializeRun(JSON.stringify(broken))).toBeNull();
   });
 });

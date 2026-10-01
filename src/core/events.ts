@@ -37,6 +37,10 @@ export type CoreEvent =
   | { readonly type: 'leveled-up'; readonly level: number }
   /** Item foi pro inventário; `equipped` = vestiu na hora (era melhor que o do slot). */
   | { readonly type: 'looted'; readonly itemId: ItemId; readonly equipped: boolean }
+  /** Inventário: vestiu um item da mochila (o antigo do slot, se havia, voltou pra mochila). */
+  | { readonly type: 'equipped'; readonly itemId: ItemId }
+  /** Inventário: tirou o item do slot e guardou na mochila. */
+  | { readonly type: 'unequipped'; readonly itemId: ItemId }
   | { readonly type: 'room-cleared'; readonly explored: number; readonly trainingEarned: boolean }
   | { readonly type: 'training-offered' }
   | { readonly type: 'trained'; readonly stat: 'atk' | 'def'; readonly amount: number }

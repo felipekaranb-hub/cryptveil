@@ -72,3 +72,29 @@ export const SCENE_KEYS = {
   GAME: 'game',
   UI: 'ui',
 } as const;
+
+/** Cor de cada tom do LOG (view/format.ts → LogTone). */
+export const LOG_TONE_COLORS = {
+  normal: '#e8e2d4',
+  muted: '#8a8578',
+  danger: '#e05a4a',
+  good: '#6fcf6f',
+  mana: '#6fa8e8',
+  loot: '#c9a55c',
+  level: '#d9b8ff',
+} as const;
+
+/** Fog of war no mapa: o que nunca foi visto some; o explorado fora de vista escurece. */
+export const FOG = {
+  UNSEEN: 0x0a0a0a,
+  REMEMBERED_ALPHA: 0.55,
+} as const;
+
+export const MINIMAP_COLORS = {
+  FLOOR: 0x5a5a5a,
+  WALL: 0x262626,
+  STAIRS: 0xc9a55c,
+  TRAINING: 0x8a5ec9,
+  PLAYER: 0xe04040,
+  ENEMY: 0x7fd15a,
+} as const;

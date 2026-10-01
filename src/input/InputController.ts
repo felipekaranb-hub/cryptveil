@@ -9,6 +9,12 @@ export const MOVE_REPEAT_RATE_MS = 130;
 /** Analógico abaixo disso é ignorado (drift de controle barato de fliperama). */
 const STICK_DEADZONE = 0.5;
 
+/** Gatilho/ombro analógico conta como apertado acima disso. */
+const SHOULDER_THRESHOLD = 0.5;
+
+/** Ordem dos botões no combo de ombro: LB+A = 1, LB+B = 2, LB+X = 3, LB+Y = 4 (RB: 5–8). */
+export const CHORD_FACE_ORDER = ['A', 'B', 'X', 'Y'] as const;
+
 export type InputSource = 'keyboard' | 'gamepad';
 
 type ActionListener = (action: Action, source: InputSource) => void;
@@ -21,11 +27,12 @@ type KeyMap = Record<string, Phaser.Input.Keyboard.Key>;
  * Movimento: dispara ao apertar e repete enquanto segura (handoff §Marco 1).
  * Botões: só na borda de descida (um aperto = uma ação).
  *
- * Mapeamento atual:
- *   Teclado  — WASD/Setas: mover/atacar · Espaço: passar turno · 1–8: skills · I: inventário
- *              Enter: confirmar · Esc: cancelar
+ * Mapeamento (handoff §4.3):
+ *   Teclado  — WASD/Setas: mover/atacar · Espaço: passar turno · 1–8: hotbar · I: inventário
+ *              Enter: confirmar · Esc: cancelar · Q/E: aba anterior/próxima
  *   Controle — D-pad/analógico: mover/atacar · X: passar turno · A: confirmar · B: cancelar · Y: inventário
- *   (Skills no controle ficam pro Marco 2/3, quando a hotbar existir.)
+ *              Segurando LB: A/B/X/Y = hotbar 1–4 · Segurando RB: A/B/X/Y = hotbar 5–8 (Marco 3)
+ *              LB/RB sozinhos: aba anterior/próxima (só a tela de inventário usa)
  */
 export class InputController {
   private readonly listeners: ActionListener[] = [];
@@ -35,7 +42,7 @@ export class InputController {
   private heldSource: InputSource = 'keyboard';
   private nextRepeatAt = 0;
 
-  private prevPadButtons = { A: false, B: false, X: false, Y: false };
+  private prevPadButtons = { A: false, B: false, X: false, Y: false, LB: false, RB: false };
 
   /** Última origem usada — pra UI mostrar "A" ou "Enter" no futuro. */
   lastSource: InputSource = 'keyboard';
@@ -44,7 +51,7 @@ export class InputController {
     const kb = scene.input.keyboard;
     this.keys = kb
       ? (kb.addKeys(
-          'W,A,S,D,UP,DOWN,LEFT,RIGHT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,I,ENTER,SPACE,ESC',
+          'W,A,S,D,UP,DOWN,LEFT,RIGHT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,I,ENTER,SPACE,ESC,Q,E',
         ) as KeyMap)
       : null;
   }
@@ -132,17 +139,41 @@ export class InputController {
     if (just('SPACE')) this.emit({ type: 'wait' }, 'keyboard');
     if (just('ENTER')) this.emit({ type: 'confirm' }, 'keyboard');
     if (just('ESC')) this.emit({ type: 'cancel' }, 'keyboard');
+    if (just('Q')) this.emit({ type: 'page', delta: -1 }, 'keyboard');
+    if (just('E')) this.emit({ type: 'page', delta: 1 }, 'keyboard');
   }
 
   private updateGamepadButtons(): void {
     const pad = this.pad();
     if (!pad) return;
-    const now = { A: pad.A, B: pad.B, X: pad.X, Y: pad.Y };
-    if (now.A && !this.prevPadButtons.A) this.emit({ type: 'confirm' }, 'gamepad');
-    if (now.B && !this.prevPadButtons.B) this.emit({ type: 'cancel' }, 'gamepad');
-    if (now.X && !this.prevPadButtons.X) this.emit({ type: 'wait' }, 'gamepad');
-    if (now.Y && !this.prevPadButtons.Y) this.emit({ type: 'inventory' }, 'gamepad');
+    const now = {
+      A: pad.A,
+      B: pad.B,
+      X: pad.X,
+      Y: pad.Y,
+      LB: pad.L1 > SHOULDER_THRESHOLD,
+      RB: pad.R1 > SHOULDER_THRESHOLD,
+    };
+    const prev = this.prevPadButtons;
     this.prevPadButtons = now;
+    const pressed = (b: keyof typeof now): boolean => now[b] && !prev[b];
+
+    if (pressed('LB')) this.emit({ type: 'page', delta: -1 }, 'gamepad');
+    if (pressed('RB')) this.emit({ type: 'page', delta: 1 }, 'gamepad');
+
+    // Combo: com um ombro segurado, os botões de face viram a hotbar (LB = 1–4, RB = 5–8)
+    if (now.LB || now.RB) {
+      const offset = now.LB ? 0 : 4;
+      CHORD_FACE_ORDER.forEach((b, i) => {
+        if (pressed(b)) this.emit({ type: 'skill', slot: (offset + i + 1) as SkillSlot }, 'gamepad');
+      });
+      return;
+    }
+
+    if (pressed('A')) this.emit({ type: 'confirm' }, 'gamepad');
+    if (pressed('B')) this.emit({ type: 'cancel' }, 'gamepad');
+    if (pressed('X')) this.emit({ type: 'wait' }, 'gamepad');
+    if (pressed('Y')) this.emit({ type: 'inventory' }, 'gamepad');
   }
 
   // ------------------------------------------------------------------- util

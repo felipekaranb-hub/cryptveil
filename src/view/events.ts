@@ -1,6 +1,9 @@
 import type Phaser from 'phaser';
 import type { Point } from '../core/grid';
 import type { RunStatus } from '../core/run';
+import type { InputSource } from '../input/InputController';
+import type { LogLine } from './format';
+import type { HudSnapshot, InventoryView, MinimapView } from './hud/model';
 
 /**
  * Eventos entre GameScene (mundo) e UIScene (HUD), tipados.
@@ -13,26 +16,15 @@ export interface GameEvents {
   'resume-offered': { seed: number; floor: number; turn: number };
   'tile-clicked': { tile: Point };
   /** Linhas novas pro LOG de combate. */
-  'log': { lines: string[] };
-  'player-status': {
-    hp: number;
-    maxHp: number;
-    mana: number;
-    maxMana: number;
-    atk: number;
-    def: number;
-    level: number;
-    xp: number;
-    xpNext: number;
-    gold: number;
-    turn: number;
-    floor: number;
-    potions: { hp: number; mana: number };
-    /** Linha da hotbar pronta ("1 Brutal Strike (5) · 2 — · …"). */
-    hotbar: string;
-    /** Nome do item em cada slot mostrado (ou '—'). */
-    gear: { weapon: string; armor: string; helmet: string; shield: string };
-  };
+  'log': { lines: LogLine[] };
+  /** Tudo que o HUD mostra (painel, paper doll, hotbar). */
+  'hud': HudSnapshot;
+  'minimap': MinimapView;
+  /** Inventário aberto/atualizado (aba, linhas, seleção). */
+  'inventory-view': InventoryView;
+  'inventory-closed': Record<string, never>;
+  /** Última origem de input: a UI troca os rótulos (tecla ou botão do controle). */
+  'input-source': { source: InputSource };
   /** Escolha aberta/atualizada: cartas do level up ou opções da Training Room. */
   'choice-prompt': { title: string; options: ChoiceOption[]; selected: number };
   'choice-closed': Record<string, never>;
