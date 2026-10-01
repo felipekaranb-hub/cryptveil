@@ -2,12 +2,13 @@ import Phaser from 'phaser';
 import type { Action } from '../core/actions';
 import { getTile, TileType } from '../core/dungeon/DungeonMap';
 import type { CoreEvent } from '../core/events';
-import { inBounds } from '../core/grid';
+import { DIRECTIONS, inBounds, step } from '../core/grid';
 import { randomSeed } from '../core/rng';
-import { createTestRun, getEntity, getPlayer, type RunState } from '../core/run';
+import { createRun, getEntity, getPlayer, type RunState } from '../core/run';
 import { resolvePlayerAction } from '../core/turn/TurnManager';
 import { COLORS, MAP_VIEW, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
 import { InputController } from '../input/InputController';
+import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
@@ -25,7 +26,10 @@ interface GameSceneData {
  */
 export class GameScene extends Phaser.Scene {
   private state!: RunState;
+  /** 'resume-offer': achou run suspensa e espera Continuar/Nova run. */
+  private mode: 'playing' | 'resume-offer' = 'playing';
   private readonly views = new Map<string, EntityView>();
+  private mapGraphics: Phaser.GameObjects.Graphics | null = null;
   private controls!: InputController;
   private clickMarker!: Phaser.GameObjects.Rectangle;
 
@@ -34,27 +38,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data: GameSceneData): void {
-    // Prioridade: seed passado no restart → ?seed= na URL → seed novo
+    // Prioridade: seed passado no restart → ?seed= na URL → run suspensa → seed novo.
+    // Seed na URL é pra reproduzir bug: ignora a run suspensa (ela fica guardada
+    // até o próximo save desta run nova).
     const fromUrl = Number(new URLSearchParams(window.location.search).get('seed'));
-    const seed =
-      data.seed ?? (Number.isInteger(fromUrl) && fromUrl > 0 ? fromUrl : randomSeed());
-    this.state = createTestRun(seed);
+    const urlSeed = Number.isInteger(fromUrl) && fromUrl > 0 ? fromUrl : undefined;
+    const suspended = data.seed === undefined && urlSeed === undefined ? loadRun() : null;
+
+    this.mode = suspended ? 'resume-offer' : 'playing';
+    this.state = suspended ?? createRun(data.seed ?? urlSeed ?? randomSeed());
     this.views.clear();
+    this.mapGraphics = null;
   }
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
-    this.drawMap();
-
-    for (const entity of this.state.entities) {
-      this.views.set(entity.id, new EntityView(this, entity));
-    }
 
     this.clickMarker = this.add
       .rectangle(0, 0, TILE_SIZE, TILE_SIZE)
       .setOrigin(0)
       .setStrokeStyle(1, COLORS.HIGHLIGHT, 0.6)
+      .setDepth(10)
       .setVisible(false);
+
+    this.buildFloor();
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, this.handlePointer, this);
 
@@ -62,12 +69,26 @@ export class GameScene extends Phaser.Scene {
     this.controls.onAction((action) => this.handleAction(action));
 
     // Câmera e textos acompanham a resolução real da tela
-    bindRenderScale(this, (scale) => this.layoutCamera(scale));
+    bindRenderScale(this, (scale) => {
+      layoutCamera(this.cameras.main, scale, MAP_VIEW);
+      this.centerCamera();
+    });
+
+    // Suspender automático: aba escondida (celular troca de app, minimiza) salva a run
+    const onVisibility = (): void => {
+      if (document.hidden && this.mode === 'playing') saveRun(this.state);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+    });
 
     this.scene.launch(SCENE_KEYS.UI);
     // A UI precisa estar de pé antes de receber o estado inicial
     this.time.delayedCall(0, () => {
-      emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
+      const { seed, floor, turn } = this.state;
+      if (this.mode === 'resume-offer') emitGameEvent(this.game.events, 'resume-offered', { seed, floor, turn });
+      else emitGameEvent(this.game.events, 'run-started', { seed });
       this.emitPlayerStatus();
     });
   }
@@ -76,29 +97,63 @@ export class GameScene extends Phaser.Scene {
     this.controls.update(time);
   }
 
-  // ------------------------------------------------------------------ câmera
+  // ---------------------------------------------------------------- andar
 
-  private layoutCamera(scale: number): void {
-    // A câmera do mundo só ocupa o retângulo do mapa; o resto da tela é do HUD
-    layoutCamera(this.cameras.main, scale, MAP_VIEW);
-    this.cameras.main.setScroll(0, 0);
-    // Marco 2: cam.startFollow(player) + cam.setBounds(0, 0, mapW, mapH)
+  /** (Re)desenha o andar atual: mapa, entidades e limites da câmera. */
+  private buildFloor(): void {
+    this.mapGraphics?.destroy();
+    for (const view of this.views.values()) view.destroy();
+    this.views.clear();
+
+    this.mapGraphics = this.drawMap();
+    for (const entity of this.state.entities) {
+      this.views.set(entity.id, new EntityView(this, entity));
+    }
+    this.clickMarker.setVisible(false);
+    this.centerCamera();
   }
 
-  // ---------------------------------------------------------------- desenho
+  /**
+   * Câmera no player, presa às bordas do mapa. Feito à mão em vez de
+   * startFollow/setBounds: com origin 0 e zoom = renderScale, o Phaser
+   * calcula o centro com a largura FÍSICA do viewport e o player sai do meio.
+   * Aqui tudo é em pixels lógicos: a área visível é sempre MAP_VIEW.
+   */
+  private centerCamera(): void {
+    if (!this.state) return;
+    const { map } = this.state;
+    const p = getPlayer(this.state).pos;
+    const clamp = (target: number, view: number, world: number): number =>
+      world <= view ? (world - view) / 2 : Math.min(Math.max(target - view / 2, 0), world - view);
+    this.cameras.main.setScroll(
+      clamp(p.x * TILE_SIZE + TILE_SIZE / 2, MAP_VIEW.width, map.width * TILE_SIZE),
+      clamp(p.y * TILE_SIZE + TILE_SIZE / 2, MAP_VIEW.height, map.height * TILE_SIZE),
+    );
+  }
 
-  private drawMap(): void {
+  private drawMap(): Phaser.GameObjects.Graphics {
     const { map } = this.state;
     const g = this.add.graphics();
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
+        const p = { x, y };
         const px = x * TILE_SIZE;
         const py = y * TILE_SIZE;
-        if (getTile(map, { x, y }) === TileType.WALL) {
+        const tile = getTile(map, p);
+        if (tile === TileType.WALL) {
+          // Só desenha parede que encosta em chão; o resto é rocha (fundo)
+          const touchesFloor = DIRECTIONS.some((d) => getTile(map, step(p, d)) !== TileType.WALL);
+          if (!touchesFloor) continue;
           g.fillStyle(TILE_COLORS.WALL, 1);
           g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           g.fillStyle(TILE_COLORS.WALL_EDGE, 1);
           g.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        } else if (tile === TileType.STAIRS) {
+          g.fillStyle(TILE_COLORS.STAIRS, 1);
+          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          // Degraus provisórios até os sprites do Marco 6
+          g.fillStyle(TILE_COLORS.STAIRS_STEP, 1);
+          for (let i = 0; i < 4; i++) g.fillRect(px + 4 + i * 3, py + 6 + i * 6, TILE_SIZE - 8 - i * 6, 3);
         } else {
           const light = (x + y) % 2 === 0;
           g.fillStyle(light ? TILE_COLORS.FLOOR_LIGHT : TILE_COLORS.FLOOR_DARK, 1);
@@ -106,11 +161,23 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+    return g.setDepth(-1);
   }
 
   // ------------------------------------------------------------------- turno
 
   private handleAction(action: Action): void {
+    if (this.mode === 'resume-offer') {
+      if (action.type === 'confirm') {
+        this.mode = 'playing';
+        emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
+      } else if (action.type === 'cancel') {
+        clearRun();
+        this.restartRun();
+      }
+      return;
+    }
+
     if (this.state.status !== 'playing') {
       // Fim de run: Enter / A começa outra com seed novo
       if (action.type === 'confirm') this.restartRun();
@@ -134,6 +201,7 @@ export class GameScene extends Phaser.Scene {
       switch (event.type) {
         case 'moved':
           this.views.get(event.entityId)?.setTile(event.to);
+          if (event.entityId === this.state.playerId) this.centerCamera();
           break;
         case 'attacked': {
           const target = getEntity(this.state, event.targetId);
@@ -148,8 +216,16 @@ export class GameScene extends Phaser.Scene {
         case 'died':
           this.views.get(event.entityId)?.die();
           break;
+        case 'descended':
+          // O core já trocou mapa e monstros: redesenha tudo e suspende a run
+          this.buildFloor();
+          this.cameras.main.fadeIn(250);
+          saveRun(this.state);
+          break;
         case 'victory':
         case 'defeat':
+          // Roguelite: run acabada não tem "Continuar"
+          clearRun();
           emitGameEvent(this.game.events, 'run-ended', {
             result: event.type === 'victory' ? 'won' : 'lost',
             turns: this.state.turn,
@@ -170,6 +246,7 @@ export class GameScene extends Phaser.Scene {
       atk: p.atk,
       def: p.def,
       turn: this.state.turn,
+      floor: this.state.floor,
     });
   }
 

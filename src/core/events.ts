@@ -15,5 +15,7 @@ export type CoreEvent =
     }
   | { readonly type: 'died'; readonly entityId: string }
   | { readonly type: 'waited'; readonly entityId: string }
+  /** Player pisou na escada: o RunState já está no andar novo (mapa e monstros trocados). */
+  | { readonly type: 'descended'; readonly floor: number }
   | { readonly type: 'victory' }
   | { readonly type: 'defeat' };

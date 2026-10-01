@@ -12,6 +12,8 @@ export function formatEvent(event: CoreEvent, state: RunState): string | null {
       return `${name(event.attackerId)} acerta ${name(event.targetId)}: ${event.damage}`;
     case 'died':
       return `${name(event.entityId)} morreu`;
+    case 'descended':
+      return `Você desce ao andar ${event.floor}`;
     case 'waited':
       return `${name(event.entityId)} espera`;
     case 'victory':

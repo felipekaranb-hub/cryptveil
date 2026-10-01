@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '../actions';
+import { FINAL_FLOOR } from '../balance';
+import { setTile, TileType } from '../dungeon/DungeonMap';
+import { isAlive } from '../entities/Entity';
 import type { CoreEvent } from '../events';
 import { createTestRun, getEntity, getPlayer, type RunState } from '../run';
 import { resolvePlayerAction } from './TurnManager';
@@ -17,7 +20,7 @@ function goblin(state: RunState) {
 /** Joga até alguém morrer, sempre indo pra cima do goblin. */
 function fightToTheEnd(state: RunState): CoreEvent[] {
   const all: CoreEvent[] = [];
-  for (let i = 0; i < 200 && state.status === 'playing'; i++) {
+  for (let i = 0; i < 200 && state.status === 'playing' && isAlive(goblin(state)); i++) {
     all.push(...resolvePlayerAction(state, E).events);
   }
   return all;
@@ -47,11 +50,19 @@ describe('TurnManager', () => {
 
   it('passar o turno deixa o goblin agir', () => {
     const state = createTestRun(1);
+    goblin(state).pos = { x: 10, y: 5 };
     const r = resolvePlayerAction(state, WAIT);
     expect(r.tookTurn).toBe(true);
     expect(r.events[0]).toEqual({ type: 'waited', entityId: 'player' });
     expect(getPlayer(state).pos).toEqual({ x: 3, y: 5 });
-    expect(goblin(state).pos).toEqual({ x: 10, y: 5 });
+    expect(goblin(state).pos).toEqual({ x: 9, y: 5 });
+  });
+
+  it('goblin longe demais (fora do aggro) fica parado', () => {
+    const state = createTestRun(1);
+    // x=3 → x=11: distância 8, acima do AGGRO_RANGE
+    resolvePlayerAction(state, WAIT);
+    expect(goblin(state).pos).toEqual({ x: 11, y: 5 });
   });
 
   it('bump ataca só o tile da direção apertada', () => {
@@ -83,18 +94,27 @@ describe('TurnManager', () => {
     expect(getPlayer(state).hp).toBe(49);
   });
 
-  it('Knight vence o Goblin dummy e a run termina em vitória', () => {
+  it('Knight mata o Goblin dummy e a run continua (vitória só na escada final)', () => {
     const state = createTestRun(42);
     const events = fightToTheEnd(state);
-    expect(state.status).toBe('won');
-    expect(events.at(-1)).toEqual({ type: 'victory' });
     expect(events).toContainEqual({ type: 'died', entityId: 'goblin-1' });
     expect(goblin(state).hp).toBe(0);
+    expect(state.status).toBe('playing');
+  });
+
+  it('pisar na escada do andar final termina a run em vitória', () => {
+    const state = createTestRun(42);
+    state.floor = FINAL_FLOOR;
+    setTile(state.map, { x: 2, y: 5 }, TileType.STAIRS);
+    const r = resolvePlayerAction(state, W);
+    expect(state.status).toBe('won');
+    expect(r.events.at(-1)).toEqual({ type: 'victory' });
   });
 
   it('depois do fim, nenhuma ação tem efeito', () => {
     const state = createTestRun(42);
-    fightToTheEnd(state);
+    getPlayer(state).hp = 0;
+    state.status = 'lost';
     const r = resolvePlayerAction(state, W);
     expect(r).toEqual({ tookTurn: false, reason: 'not-playing', events: [] });
   });

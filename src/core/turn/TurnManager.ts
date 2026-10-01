@@ -1,12 +1,13 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
 import { rollDamage } from '../combat/damage';
-import { isWalkable } from '../dungeon/DungeonMap';
+import { FINAL_FLOOR } from '../balance';
+import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
 import { isAlive, type Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
 import { step, type Direction } from '../grid';
 import { Rng } from '../rng';
-import { entityAt, getPlayer, livingEnemies, type RunState } from '../run';
+import { enterNextFloor, entityAt, getPlayer, livingEnemies, type RunState } from '../run';
 
 /**
  * Resultado de uma ação do jogador (discriminated union).
@@ -53,8 +54,15 @@ export function resolvePlayerAction(
       return { tookTurn: false, reason: 'not-a-turn-action', events: [] };
   }
 
-  if (livingEnemies(state).length === 0) {
-    finish(state, 'won', events);
+  if (getTile(state.map, player.pos) === TileType.STAIRS) {
+    // Escada: desce na hora e os monstros do andar velho não agem.
+    // A escada do andar final termina a run (Marco 4: Orc Warlord antes dela).
+    if (state.floor >= FINAL_FLOOR) {
+      finish(state, 'won', events);
+    } else {
+      enterNextFloor(state, rng);
+      events.push({ type: 'descended', floor: state.floor });
+    }
   } else {
     // --- vez dos inimigos, na ordem da lista
     for (const enemy of livingEnemies(state)) {

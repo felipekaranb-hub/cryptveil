@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026. **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 2a). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -112,7 +112,7 @@ Repetição de movimento: 130 ms (constantes no `InputController`). **Toque na t
 
 - Resolução **lógica** 960×540 (16:9): todo o código usa essas coordenadas. O canvas é desenhado na resolução **física** da tela (considera `devicePixelRatio`, ou seja, escala do Windows em 125%/150% e telas retina), então texto e bordas saem nítidos. Ver `src/view/scaling.ts`.
 - `renderScale` = pixels físicos por pixel lógico: inteiro quando ≥ 2 (pixel art uniforme), fracionário abaixo disso pra preencher a tela. As câmeras usam `layoutCamera()` e os textos ganham `setResolution(scale)` via `bindRenderScale()`. **Texto criado depois do `create()` precisa de `setResolution(getRenderScale())`.**
-- Mapa numa câmera própria com viewport de **15×11 tiles (480×352)**, centralizado. A partir do Marco 2 ela segue o player com `setBounds`.
+- Mapa numa câmera própria com viewport de **15×11 tiles (480×352)**, centralizado. Desde o Marco 2a ela segue o player, presa às bordas do mapa. O scroll é calculado à mão (`GameScene.centerCamera`), em pixels lógicos: `startFollow`/`setBounds` do Phaser erram o centro com `setOrigin(0,0)` + zoom = renderScale.
 - HUD na **`UIScene`**, em paralelo, com câmera fixa. GameScene e UIScene conversam por eventos tipados (`src/view/events.ts`), nunca por referência direta.
 - Celular em pé fica minúsculo (o jogo é paisagem). Aceito no MVP.
 
@@ -123,7 +123,7 @@ Monstros, itens, relíquias e skills em **`.ts` com `satisfies`**, não `.json`:
 ### 4.6 Save
 
 - **Meta-progressão** (gold, upgrades, bestiário): LocalStorage, Marco 5, com `version` + migração.
-- **Run em andamento — MUDOU no v2:** "suspender automático". Salvar a run ao trocar de andar e quando a aba for escondida (`visibilitychange`); ao abrir, oferecer "Continuar". Morte apaga o save (continua roguelite). Entra no Marco 2, junto com a transição de andar. Motivo: navegador de celular mata aba em segundo plano e fechar a aba não pode custar a run.
+- **Run em andamento — MUDOU no v2:** "suspender automático". Salvar a run ao trocar de andar e quando a aba for escondida (`visibilitychange`); ao abrir, oferecer "Continuar". Morte apaga o save (continua roguelite). Entregue no Marco 2a: formato e migração em `core/save/runSave.ts` (lógica pura), LocalStorage em `src/storage/runStorage.ts`. `?seed=` na URL ignora a run suspensa (é pra reproduzir bug). Motivo: navegador de celular mata aba em segundo plano e fechar a aba não pode custar a run.
 
 ### 4.7 Pastas
 
@@ -142,19 +142,20 @@ cryptveil/
     │   ├── grid.ts            # Point, Direction, step, manhattan, neighbors4
     │   ├── rng.ts             # Rng com seed
     │   ├── combat/damage.ts   # Fórmula de dano
-    │   ├── events.ts          # CoreEvent (moved, attacked, died, waited, victory, defeat)
+    │   ├── events.ts          # CoreEvent (moved, attacked, died, waited, descended, victory, defeat)
     │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
-    │   ├── run.ts             # RunState serializável + createTestRun + consultas
+    │   ├── run.ts             # RunState serializável, createRun, enterNextFloor, createTestRun, consultas
     │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
     │   ├── data/entities.ts   # Modelos (knight, goblinDummy) com satisfies
-    │   ├── dungeon/           # DungeonMap + TileType — (M2) DungeonGenerator BSP, Room
+    │   ├── dungeon/           # DungeonMap, TileType, Room, DungeonGenerator (BSP), populate (monstros)
+    │   ├── save/runSave.ts    # RunState ↔ texto, versão e migração (suspender automático)
     │   ├── entities/Entity.ts # Entidade como dado puro
     │   ├── turn/TurnManager.ts# resolvePlayerAction → TurnResult + eventos
-    │   ├── (M2) items/        # Item, Inventory, LootTable
-    │   ├── (M2) run/          # RunState serializável + save da run
+    │   ├── (M2b) items/       # Item, Inventory, LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
-    │   └── (M2+) data/        # enemies.ts, items.ts, relics.ts, skills.ts
+    │   └── (M2b+) data/       # enemies.ts, items.ts, relics.ts, skills.ts
     ├── input/InputController.ts
+    ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
     ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
     └── view/                  # coords (tile↔pixel), scaling, events, (M1+) renderers de entidade
 ```
@@ -175,8 +176,21 @@ View: `EntityView` (quadrado + letra + barra de HP, flash no golpe, fade na mort
 Decisões tomadas: **passar o turno** (Espaço / X); **Enter / A no fim começa run nova** com seed novo; **jogador sempre age primeiro**, depois os inimigos na ordem da lista.
 Observação: o Goblin dummy (ATK 3) contra DEF 5 sempre dá 1 de dano — é o risco da §2.12 aparecendo cedo. Os monstros reais do Marco 4 precisam de ATK acima da DEF esperada do Knight em cada andar.
 
-### Marco 2 — Loop de run
-BSP real, corredores, STAIRS, transição de andar, câmera seguindo, `RunState` serializável + **suspender automático**, Item/Inventory/LootTable, Knight completo (4 skills, mana, passiva +2 HP por kill), XP/level, Training Room.
+### Marco 2 — Loop de run (dividido em 2a e 2b em 01/10/2026)
+
+#### ✅ Marco 2a — A run (entregue em 01/10/2026)
+BSP real (`DungeonGenerator`: folhas, uma sala por folha, corredor em L entre as salas mais próximas de cada divisão → andar sempre conexo), tile `STAIRS`, 5 andares, câmera seguindo o player, `RunState` v2 (`floor`, `rooms`) + suspender automático com "Continuar". 144 testes (60 seeds checando conexidade, escada alcançável, borda fechada e salas sem sobreposição; descida; vitória no andar 5; save ida e volta, v1 descartado, save corrompido rejeitado).
+Decisões tomadas:
+- Mapa **44×32**, folha mínima 10 → **6–12 salas por andar** (moda 8, medido em 500 seeds). Números em `balance.ts` (`DUNGEON`).
+- Escada **só desce**, e pisar nela já desce: os monstros do andar velho não agem nesse turno. A escada fica no tile de sala mais longe do início, andando.
+- Escada do **andar 5 = vitória** (placeholder; no Marco 4 o Warlord fica antes dela). Matar todos os monstros não vence mais nada.
+- Monstros: 0–2 por sala, nunca na sala inicial. **Provisório:** Goblin dummy com +5 HP e +2 ATK por andar (`PLACEHOLDER_ENEMY_GROWTH`) até os monstros reais do Marco 4.
+- **Aggro:** monstro só persegue o player a até 7 tiles (Manhattan, `AGGRO_RANGE`). Sem isso o andar inteiro convergia no primeiro turno. Não tem memória: se o player se afasta, ele para.
+- Save: gravado ao descer e no `visibilitychange`; "Nova run" (Esc/B) na tela de "Continuar" apaga a suspensa; vitória e morte apagam.
+- Sem regen de HP no 2a (a cura e a passiva entram no 2b): descer os 5 andares agora é difícil de propósito.
+
+#### Marco 2b — O Knight
+Item/Inventory/LootTable (itens do Knight da §2.4, chances provisórias), 4 skills com mana, passiva +2 HP por kill, XP/level, gold por kill, Training Room. Decisões já fechadas na §7.
 
 ### Marco 3 — UI completa
 HUD (HP/Mana, stats, equipamento de 8 slots + 3 relíquias), BattleLog lendo os eventos do core, hotbar 1–8 (**+ mapeamento no controle**), InventoryUI (Equipado/Pra vender), MiniMap + fog of war (`Set` de `pointKey` por andar).
@@ -208,12 +222,17 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
 ## 7. Pendências e decisões em aberto
 
 - **Lacunas de design (GDD perdido) — decidir no marco indicado:**
-  - [ ] Marco 2: as outras 3 skills do Knight (só o Berserk é conhecido), custo de mana, mana máxima inicial, curva de XP por nível, quanto gold cada kill rende.
-  - [ ] Marco 2: o que é "sala explorada" na Training Room.
+  - [x] Marco 2 (decidido em 01/10/2026, números provisórios; balancear depois):
+    - **Skills do Knight**, sem cooldown, só mana: **Brutal Strike** (1 alvo adjacente, ATK×1,5, 5 mana) · **Berserk** (4 adjacentes, ATK×1,0, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,0, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana).
+    - **Mana:** 30 max no início, regenera 1 a cada 2 turnos. HP não regenera sozinho (só passiva +2 por kill e cura).
+    - **XP:** o próximo nível custa `20 × nível atual` (20, 40, 60…). XP de cada monstro no template.
+    - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.
+    - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
+  - [ ] Marco 2b: o que é "sala explorada" na Training Room (explicado de novo ao Felipe; aguardando).
+  - [ ] Marco 2b ou 4: **poções** (o Felipe gostou da ideia; falta decidir quais e quando entram).
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).
-- [ ] **"Sala explorada"** na Training Room: entrou na sala? Limpou os monstros? Decidir no Marco 2.
 - [ ] Mapeamento das skills no controle (Marco 3).
 - [ ] Empilhamento de DEF (§2.12) — vigiar no Marco 4.
 

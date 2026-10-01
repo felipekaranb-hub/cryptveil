@@ -67,6 +67,10 @@ export class EntityView {
     });
   }
 
+  destroy(): void {
+    this.container.destroy();
+  }
+
   /** Some aos poucos ao morrer. */
   die(): void {
     this.scene.tweens.add({

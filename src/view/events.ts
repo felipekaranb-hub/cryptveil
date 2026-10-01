@@ -9,10 +9,19 @@ import type { RunStatus } from '../core/run';
  */
 export interface GameEvents {
   'run-started': { seed: number };
+  /** Achou run suspensa: a UI pergunta se continua (Enter/A) ou começa outra (Esc/B). */
+  'resume-offered': { seed: number; floor: number; turn: number };
   'tile-clicked': { tile: Point };
   /** Linhas novas pro LOG de combate. */
   'log': { lines: string[] };
-  'player-status': { hp: number; maxHp: number; atk: number; def: number; turn: number };
+  'player-status': {
+    hp: number;
+    maxHp: number;
+    atk: number;
+    def: number;
+    turn: number;
+    floor: number;
+  };
   'run-ended': { result: Exclude<RunStatus, 'playing'>; turns: number };
 }
 

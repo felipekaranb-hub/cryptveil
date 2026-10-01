@@ -50,7 +50,7 @@ export class UIScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, 22, 'CRYPTVEIL', style(28, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0);
     this.subtitle = this.add
-      .text(GAME_WIDTH / 2, 56, 'Marco 1', style(12, TEXT_COLORS.MUTED))
+      .text(GAME_WIDTH / 2, 56, 'Marco 2a', style(12, TEXT_COLORS.MUTED))
       .setOrigin(0.5, 0);
 
     // --- painel esquerdo: status do Knight
@@ -89,6 +89,7 @@ export class UIScene extends Phaser.Scene {
 
     const events = this.game.events;
     onGameEvent(events, 'run-started', this.onRunStarted, this);
+    onGameEvent(events, 'resume-offered', this.onResumeOffered, this);
     onGameEvent(events, 'player-status', this.onPlayerStatus, this);
     onGameEvent(events, 'log', this.onLog, this);
     onGameEvent(events, 'run-ended', this.onRunEnded, this);
@@ -101,6 +102,7 @@ export class UIScene extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offGameEvent(events, 'run-started', this.onRunStarted, this);
+      offGameEvent(events, 'resume-offered', this.onResumeOffered, this);
       offGameEvent(events, 'player-status', this.onPlayerStatus, this);
       offGameEvent(events, 'log', this.onLog, this);
       offGameEvent(events, 'run-ended', this.onRunEnded, this);
@@ -123,21 +125,32 @@ export class UIScene extends Phaser.Scene {
     const cy = MAP_VIEW.y + MAP_VIEW.height / 2;
     const shade = this.add.rectangle(MAP_VIEW.x, MAP_VIEW.y, MAP_VIEW.width, MAP_VIEW.height, 0x000000, 0.72).setOrigin(0);
     this.overlayTitle = this.add.text(cx, cy - 18, '', style(36)).setOrigin(0.5);
-    this.overlaySub = this.add.text(cx, cy + 24, '', style(12, TEXT_COLORS.PRIMARY)).setOrigin(0.5);
+    this.overlaySub = this.add
+      .text(cx, cy + 18, '', { ...style(12, TEXT_COLORS.PRIMARY), align: 'center' })
+      .setOrigin(0.5, 0);
     this.overlay = this.add.container(0, 0, [shade, this.overlayTitle, this.overlaySub]).setVisible(false);
   }
 
   // ------------------------------------------------------------------ eventos
 
   private onRunStarted({ seed }: GameEvents['run-started']): void {
-    this.subtitle.setText(`Marco 1  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2a  ·  seed ${seed}`);
     this.overlay.setVisible(false);
   }
 
-  private onPlayerStatus({ hp, maxHp, atk, def, turn }: GameEvents['player-status']): void {
+  private onResumeOffered({ seed, floor, turn }: GameEvents['resume-offered']): void {
+    this.subtitle.setText(`Marco 2a  ·  seed ${seed}`);
+    this.overlayTitle.setText('RUN SUSPENSA').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
+    this.overlaySub.setText(
+      `Andar ${floor}  ·  turno ${turn}\n\nEnter / A: continuar\nEsc / B: nova run`,
+    );
+    this.overlay.setVisible(true);
+  }
+
+  private onPlayerStatus({ hp, maxHp, atk, def, turn, floor }: GameEvents['player-status']): void {
     this.hpText.setText(`HP ${hp}/${maxHp}`);
     this.hpFill.width = Math.round(HP_BAR_W * Math.max(0, hp / maxHp));
-    this.statsText.setText(`ATK ${atk}\nDEF ${def}\nTurno ${turn}`);
+    this.statsText.setText(`Andar ${floor}\nATK ${atk}\nDEF ${def}\nTurno ${turn}`);
   }
 
   private onLog({ lines }: GameEvents['log']): void {
@@ -150,6 +163,7 @@ export class UIScene extends Phaser.Scene {
     const won = result === 'won';
     this.overlayTitle
       .setText(won ? 'VICTORY' : 'YOU DIED')
+      .setFontSize(36)
       .setColor(won ? TEXT_COLORS.ACCENT : '#c0392b');
     this.overlaySub.setText(`${turns} turnos  ·  Enter / A: nova run`);
     this.overlay.setVisible(true);

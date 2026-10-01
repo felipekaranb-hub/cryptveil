@@ -45,6 +45,8 @@ export const TILE_COLORS = {
   FLOOR_DARK: 0x343434,
   WALL: 0x1a1a1a,
   WALL_EDGE: 0x262626,
+  STAIRS: 0x6b4423,
+  STAIRS_STEP: 0xc9a55c,
 } as const;
 
 export const TEXT_COLORS = {

@@ -4,6 +4,8 @@ import { inBounds, type Point } from '../grid';
 export const TileType = {
   FLOOR: 0,
   WALL: 1,
+  /** Escada pra baixo: pisar nela desce de andar. */
+  STAIRS: 2,
 } as const;
 export type TileType = (typeof TileType)[keyof typeof TileType];
 
@@ -19,9 +21,14 @@ export function getTile(map: DungeonMap, p: Point): TileType {
   return map.tiles[p.y * map.width + p.x] ?? TileType.WALL;
 }
 
-/** Fora do mapa conta como parede. */
+/** Fora do mapa conta como parede. Escada é chão (dá pra pisar). */
 export function isWalkable(map: DungeonMap, p: Point): boolean {
-  return getTile(map, p) === TileType.FLOOR;
+  return getTile(map, p) !== TileType.WALL;
+}
+
+/** Mapa todo de parede; o gerador escava salas e corredores. */
+export function createFilledMap(width: number, height: number): DungeonMap {
+  return { width, height, tiles: new Array<TileType>(width * height).fill(TileType.WALL) };
 }
 
 /** Sala fixa de teste (Marco 1): borda de parede, interior de chão. */

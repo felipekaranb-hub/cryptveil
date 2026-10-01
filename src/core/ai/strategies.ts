@@ -1,6 +1,7 @@
 import type { AiId, Entity } from '../entities/Entity';
 import { isWalkable } from '../dungeon/DungeonMap';
-import { isAdjacent4, type Direction } from '../grid';
+import { AGGRO_RANGE } from '../balance';
+import { isAdjacent4, manhattan, type Direction } from '../grid';
 import { bfsFirstStep } from '../pathfinding';
 import { entityAt, getPlayer, type RunState } from '../run';
 
@@ -17,10 +18,15 @@ export type EnemyIntent =
  */
 export type AiStrategy = (self: Entity, state: RunState) => EnemyIntent;
 
-/** Persegue o player pelo caminho mais curto (BFS) e ataca quando encosta. */
+/**
+ * Persegue o player pelo caminho mais curto (BFS) e ataca quando encosta.
+ * Só acorda com o player a até AGGRO_RANGE: sem isso o andar inteiro
+ * convergiria pra cima dele no primeiro turno.
+ */
 export const chase: AiStrategy = (self, state) => {
   const player = getPlayer(state);
   if (isAdjacent4(self.pos, player.pos)) return { type: 'attack', targetId: player.id };
+  if (manhattan(self.pos, player.pos) > AGGRO_RANGE) return { type: 'idle' };
 
   const dir = bfsFirstStep(
     self.pos,
