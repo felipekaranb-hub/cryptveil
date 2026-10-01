@@ -35,7 +35,7 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | 2.4 | Equipamento do Knight | Começa com Sword. Tabela abaixo. |
 | 2.5 | Itens | `equipTags: Vocation[]`. Drop universal, equip restrito (`canEquip` aceita a vocação ou `'ALL'`). Fora da vocação → aba "Pra vender". |
 | 2.6 | Stats | Só **ATK** e **DEF**. Skills usam o mesmo ATK. |
-| 2.7 | Training Room | A cada **10** salas exploradas (era 5; mudou no Marco 2c), o próximo andar gera 1 Training Room: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. Level up dá só +10 HP max e +10 Mana max. |
+| 2.7 | Training Room | A cada **6** salas exploradas (era 5; mudou no Marco 2c), o próximo andar gera 1 Training Room: escolha única +2 ATK ou +2 DEF. Não persiste entre runs. Level up dá só +10 HP max e +10 Mana max. |
 | 2.8 | Slots | Paper doll de 8 (Helmet, Amulet, Armor, Ring, Weapon, Shield, Legs, Boots) + 3 de relíquia. |
 | 2.9 | Flags especiais | Minotaur: 1 ação/turno. Vampire: cura 50% do dano causado. Ghost: `ignoresWalls` no pathfinding, mas não termina movimento em parede. |
 | 2.10 | Ações | Bater em parede não gasta turno. Bump ataca só o tile da direção. Berserk ataca os 4 adjacentes. |
@@ -205,7 +205,7 @@ Decisões tomadas (além das da §7):
 #### ✅ Marco 2c — Ajustes de sensação (entregue em 01/10/2026)
 Feedback do Felipe jogando o 2b: cura + regen de mana era exploit; Training Room demais; equipamento e treino não se sentiam; skills batiam igual ao golpe básico; drop alto.
 - **Mana só de lutar:** sem regen por turno; **+4 de mana por kill** (`MANA_PER_KILL`), além de poção e level up. Esperar não rende nada.
-- **Training Room a cada 10 salas** (~1 a cada 1–2 andares; §2.7 atualizada).
+- **Training Room a cada 6 salas** (o Felipe pediu 5–6; §2.7 atualizada). Com ~8 salas por andar, quem limpa o andar inteiro ainda ganha quase uma por andar.
 - **Skills:** Brutal Strike ×2,0 · Berserk ×1,25 em cada alvo · Whirlwind Throw ×1,5. Custos iguais.
 - **Golpes por kill importam:** Goblin provisório com 24 HP base +8 por andar (era 15 +5); itens com bônus maiores (Spike Sword +8, Magic Sword +15; armaduras 2/4/7, elmos 1/3/5, escudos 2/4/7).
 - **Feedback visual:** número de dano/cura/mana flutuando em cima da entidade (antecipado do Marco 6) e LOG com "ATK 10 → 15" ao equipar ou treinar. Tremidinha só quando o player leva ≥ 20% do HP max.
@@ -249,7 +249,7 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
     - **XP:** o próximo nível custa `20 × nível atual` (20, 40, 60…). XP de cada monstro no template.
     - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.
     - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
-  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 10 (Marco 2c), o próximo andar ganha uma Training Room.
+  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 6 (Marco 2c), o próximo andar ganha uma Training Room.
   - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (no 2b; desde o 2c vem de kill) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.

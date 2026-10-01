@@ -76,8 +76,7 @@ export const POTION_DROP_CHANCE = { hpPotion: 0.05, manaPotion: 0.08 } as const;
 
 /**
  * Training Room: a cada N salas exploradas (entrou e matou os monstros dela).
- * Era 5 (§2.7 original); com 6–12 salas por andar isso dava uma por andar.
- * 10 → uma a cada 1–2 andares (decisão do Felipe, Marco 2c).
+ * Era 5 (§2.7 original); o Felipe pediu 5–6 no Marco 2c → 6.
  */
-export const ROOMS_PER_TRAINING = 10;
+export const ROOMS_PER_TRAINING = 6;
 export const TRAINING_BONUS = 2;
