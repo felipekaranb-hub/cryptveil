@@ -109,7 +109,8 @@ Repetição de movimento: 130 ms (constantes no `InputController`). **Toque na t
 
 ### 4.4 Tela
 
-- Resolução base **960×540** (16:9). Zoom **inteiro** quando cabe (2× em 1080p, 4× em 4K); fracionário só em tela menor que 960×540. Ver `src/view/scaling.ts`.
+- Resolução **lógica** 960×540 (16:9): todo o código usa essas coordenadas. O canvas é desenhado na resolução **física** da tela (considera `devicePixelRatio`, ou seja, escala do Windows em 125%/150% e telas retina), então texto e bordas saem nítidos. Ver `src/view/scaling.ts`.
+- `renderScale` = pixels físicos por pixel lógico: inteiro quando ≥ 2 (pixel art uniforme), fracionário abaixo disso pra preencher a tela. As câmeras usam `layoutCamera()` e os textos ganham `setResolution(scale)` via `bindRenderScale()`. **Texto criado depois do `create()` precisa de `setResolution(getRenderScale())`.**
 - Mapa numa câmera própria com viewport de **15×11 tiles (480×352)**, centralizado. A partir do Marco 2 ela segue o player com `setBounds`.
 - HUD na **`UIScene`**, em paralelo, com câmera fixa. GameScene e UIScene conversam por eventos tipados (`src/view/events.ts`), nunca por referência direta.
 - Celular em pé fica minúsculo (o jogo é paisagem). Aceito no MVP.

@@ -16,6 +16,7 @@ import {
 import { InputController, type InputSource } from '../input/InputController';
 import { worldToTile } from '../view/coords';
 import { emitGameEvent } from '../view/events';
+import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 /**
  * Cena do MUNDO: só desenha o mapa e recebe input.
@@ -46,7 +47,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.setupCamera();
+    this.cameras.main.setBackgroundColor(TILE_COLORS.WALL);
     this.drawCheckerboard();
     this.drawCornerLabels();
 
@@ -66,6 +67,9 @@ export class GameScene extends Phaser.Scene {
     this.controls = new InputController(this);
     this.controls.onAction((action, source) => this.handleAction(action, source));
 
+    // Câmera e textos acompanham a resolução real da tela
+    bindRenderScale(this, (scale) => this.layoutCamera(scale));
+
     this.scene.launch(SCENE_KEYS.UI);
     // A UI precisa estar de pé antes de ouvir o seed
     this.time.delayedCall(0, () => emitGameEvent(this.game.events, 'run-started', { seed: this.seed }));
@@ -77,12 +81,10 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ câmera
 
-  private setupCamera(): void {
-    const cam = this.cameras.main;
+  private layoutCamera(scale: number): void {
     // A câmera do mundo só ocupa o retângulo do mapa; o resto da tela é do HUD
-    cam.setViewport(MAP_VIEW.x, MAP_VIEW.y, MAP_VIEW.width, MAP_VIEW.height);
-    cam.setBackgroundColor(TILE_COLORS.WALL);
-    cam.setScroll(0, 0);
+    layoutCamera(this.cameras.main, scale, MAP_VIEW);
+    this.cameras.main.setScroll(0, 0);
     // Marco 2: cam.startFollow(player) + cam.setBounds(0, 0, mapW, mapH)
   }
 
@@ -124,15 +126,16 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------------- input
 
   private handlePointer(pointer: Phaser.Input.Pointer): void {
-    // pointer.x/y estão em coordenadas do jogo (960×540), já descontado o zoom
+    // pointer.x/y estão em pixels do canvas; o viewport da câmera também
+    const cam = this.cameras.main;
     const insideMap =
-      pointer.x >= MAP_VIEW.x &&
-      pointer.x < MAP_VIEW.x + MAP_VIEW.width &&
-      pointer.y >= MAP_VIEW.y &&
-      pointer.y < MAP_VIEW.y + MAP_VIEW.height;
+      pointer.x >= cam.x &&
+      pointer.x < cam.x + cam.width &&
+      pointer.y >= cam.y &&
+      pointer.y < cam.y + cam.height;
     if (!insideMap) return;
 
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const world = cam.getWorldPoint(pointer.x, pointer.y);
     const tile = worldToTile(world.x, world.y);
     if (!inBounds(tile, VIEWPORT_W, VIEWPORT_H)) return;
 

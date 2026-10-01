@@ -10,6 +10,7 @@ import {
   TEXT_COLORS,
 } from '../config/display';
 import { onGameEvent, offGameEvent, type GameEvents } from '../view/events';
+import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 const LOG_LINES = 5;
 
@@ -77,6 +78,11 @@ export class UIScene extends Phaser.Scene {
     onGameEvent(events, 'run-started', this.onRunStarted, this);
     onGameEvent(events, 'tile-clicked', this.onTileClicked, this);
     onGameEvent(events, 'action', this.onAction, this);
+
+    // HUD em coordenadas lógicas 960×540, desenhado na resolução real
+    bindRenderScale(this, (scale) =>
+      layoutCamera(this.cameras.main, scale, { x: 0, y: 0, width: GAME_WIDTH, height: GAME_HEIGHT }),
+    );
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       offGameEvent(events, 'run-started', this.onRunStarted, this);
