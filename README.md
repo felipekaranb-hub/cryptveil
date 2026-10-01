@@ -3,6 +3,8 @@
 Roguelite por turnos no navegador, inspirado em Tibia.
 TypeScript + Phaser 4 + Vite.
 
+**Jogar:** https://felipekaranb-hub.github.io/cryptveil/ (atualiza sozinho a cada push na `main`)
+
 ## Rodar
 
 Precisa de Node.js 20.19+ (recomendado 22 ou mais novo).
