@@ -15,6 +15,20 @@ Atualizado em 01/10/2026 (Marco 2c). **Substitui o handoff v1.** Este documento 
 
 ---
 
+## 0.1 Vocabulário (combinado com o Felipe em 01/10/2026)
+
+Hierarquia, do menor pro maior. Usar **sempre** esses termos, em conversa, código e documento:
+
+| Termo | O que é | No código |
+|---|---|---|
+| **Sala** | Retângulo dentro de um andar, ligado a outras salas por corredores. Um andar tem 6–12. | `Room` |
+| **Andar** | Tudo que existe entre uma escada e a próxima. | `floor` |
+| **Região** | Conjunto de andares. **Toda região tem um boss, no último andar dela.** No MVP: Região 1 = andares 1–5, boss Orc Warlord. | (Marco 4) |
+| **Run** | Uma tentativa inteira, do andar 1 até morrer ou vencer. | `RunState` |
+
+- **Sala de treino** (Training Room) é uma *sala* especial dentro de um *andar*.
+- "Sala explorada" = sala em que o player entrou e matou os monstros que nasceram nela.
+
 ## 1. O jogo em uma frase
 
 Roguelite por turnos no navegador, inspirado em Tibia: Knight desce 5 andares gerados por BSP, mata monstros, junta loot, enfrenta o Orc Warlord no andar 5; o que sobra de gold vira meta-progressão no Sanctum.

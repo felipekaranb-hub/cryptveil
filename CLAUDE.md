@@ -3,6 +3,10 @@
 Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vitest 5.
 **Leia `docs/HANDOFF.md` inteiro antes de mexer no código** — decisões de design, arquitetura e marcos estão lá. O GDD original se perdeu: o handoff é a fonte única. Lacuna de design → perguntar ao Felipe (2–3 opções + recomendação) e registrar a decisão no handoff.
 
+## Vocabulário (não confundir)
+
+**Sala** (dentro do andar) → **Andar** (entre duas escadas) → **Região** (conjunto de andares, boss no último) → **Run**. Detalhes em `docs/HANDOFF.md` §0.1.
+
 ## Como trabalhar
 
 - Responder em **português (Brasil)**. Direto, prático, trade-offs honestos.
