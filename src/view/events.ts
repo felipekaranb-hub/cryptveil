@@ -17,11 +17,23 @@ export interface GameEvents {
   'player-status': {
     hp: number;
     maxHp: number;
+    mana: number;
+    maxMana: number;
     atk: number;
     def: number;
+    level: number;
+    xp: number;
+    xpNext: number;
+    gold: number;
     turn: number;
     floor: number;
+    potions: { hp: number; mana: number };
+    /** Nome do item em cada slot mostrado (ou '—'). */
+    gear: { weapon: string; armor: string; helmet: string; shield: string };
   };
+  /** Prompt da Training Room aberto/atualizado (0 = +ATK, 1 = +DEF). */
+  'training-prompt': { selected: number };
+  'training-closed': Record<string, never>;
   'run-ended': { result: Exclude<RunStatus, 'playing'>; turns: number };
 }
 

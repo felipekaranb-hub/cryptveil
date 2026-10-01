@@ -35,7 +35,42 @@ export const ENEMIES_PER_ROOM = { min: 0, max: 2 } as const;
  * PROVISÓRIO (Marco 2): o Goblin dummy cresce por andar só pra testar o loop.
  * Os monstros reais (Rat/Skeleton/Goblin/Orc) com stats próprios chegam no Marco 4.
  */
-export const PLACEHOLDER_ENEMY_GROWTH = { hpPerFloor: 5, atkPerFloor: 2 } as const;
+export const PLACEHOLDER_ENEMY_GROWTH = {
+  hpPerFloor: 5,
+  atkPerFloor: 3,
+  xpPerFloor: 2,
+  goldPerFloor: 1,
+} as const;
 
 /** Monstro só persegue quem estiver a até essa distância (Manhattan). */
 export const AGGRO_RANGE = 7;
+
+// ------------------------------------------------------- Knight e progressão
+
+/** Mana máxima inicial do Knight (handoff §7, Marco 2). */
+export const KNIGHT_START_MANA = 30;
+
+/** Regenera 1 de mana a cada N turnos. HP não regenera sozinho. */
+export const MANA_REGEN_EVERY_TURNS = 2;
+
+/** XP pro próximo nível = XP_PER_LEVEL × nível atual (20, 40, 60…). */
+export const XP_PER_LEVEL = 20;
+
+/** Level up dá só isso (handoff §2.7). Os valores atuais sobem junto. */
+export const LEVEL_UP_GAIN = { maxHp: 10, maxMana: 10 } as const;
+
+/** Passiva do Knight: cura por kill. */
+export const KILL_HEAL = 2;
+
+/**
+ * Poções caem de qualquer monstro, sorteio independente do loot.
+ * HP: rara (5%, decisão do Felipe) porque é a única cura fora da skill.
+ * Mana: mais comum (8%) e mais fraca em valor — a mana já regenera sozinha
+ * e 50% da mana inicial (15) paga 1,5 Wound Cleansing ≈ 19 HP, menos que a
+ * poção de HP (25 HP no início).
+ */
+export const POTION_DROP_CHANCE = { hpPotion: 0.05, manaPotion: 0.08 } as const;
+
+/** Training Room: a cada N salas exploradas (entrou e matou os monstros dela). */
+export const ROOMS_PER_TRAINING = 5;
+export const TRAINING_BONUS = 2;

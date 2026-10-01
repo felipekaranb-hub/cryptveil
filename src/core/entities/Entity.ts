@@ -1,9 +1,17 @@
+import type { LootTableId } from '../data/lootTables';
 import type { Point } from '../grid';
 
 export type EntityKind = 'player' | 'enemy';
 
 /** Ids das estratégias de IA (registro em core/ai). String pra serializar. */
 export type AiId = 'chase';
+
+/** O que o player ganha ao matar (gold sorteado entre min e max, todo kill ≥ 1). */
+export interface Reward {
+  readonly xp: number;
+  readonly goldMin: number;
+  readonly goldMax: number;
+}
 
 /**
  * Entidade como DADO puro. Sprite, barra de HP e animação moram na view.
@@ -21,6 +29,10 @@ export interface Entity {
   atk: number;
   def: number;
   readonly ai?: AiId;
+  readonly reward?: Reward;
+  readonly loot?: LootTableId;
+  /** Sala onde nasceu. A sala só conta como explorada quando os dela morrem. */
+  homeRoom?: number;
 }
 
 /** Modelo pra criar entidades (ver core/data). */
@@ -32,6 +44,8 @@ export interface EntityTemplate {
   readonly atk: number;
   readonly def: number;
   readonly ai?: AiId;
+  readonly reward?: Reward;
+  readonly loot?: LootTableId;
 }
 
 export function createEntity(id: string, template: EntityTemplate, pos: Point): Entity {
@@ -46,6 +60,8 @@ export function createEntity(id: string, template: EntityTemplate, pos: Point): 
     atk: template.atk,
     def: template.def,
     ...(template.ai ? { ai: template.ai } : {}),
+    ...(template.reward ? { reward: { ...template.reward } } : {}),
+    ...(template.loot ? { loot: template.loot } : {}),
   };
 }
 

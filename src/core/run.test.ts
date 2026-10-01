@@ -5,6 +5,7 @@ import { getTile, isWalkable, TileType } from './dungeon/DungeonMap';
 import { roomIndexAt } from './dungeon/Room';
 import { pointKey, step, type Direction, type Point } from './grid';
 import { bfsFirstStep } from './pathfinding';
+import { refreshPlayerStats } from './hero';
 import { createRun, getPlayer, livingEnemies, type RunState } from './run';
 import { resolvePlayerAction } from './turn/TurnManager';
 
@@ -17,6 +18,10 @@ function findStairs(state: RunState): Point {
 function walkToStairs(state: RunState, maxTurns = 400): void {
   const startFloor = state.floor;
   for (let i = 0; i < maxTurns && state.floor === startFloor && state.status === 'playing'; i++) {
+    if (state.prompt === 'training') {
+      resolvePlayerAction(state, { type: 'choose', index: 0 });
+      continue;
+    }
     const dir: Direction | null = bfsFirstStep(getPlayer(state).pos, findStairs(state), (p) =>
       isWalkable(state.map, p),
     );
@@ -88,7 +93,7 @@ describe('descer de andar', () => {
     const back: Record<Direction, Direction> = { N: 'S', S: 'N', E: 'W', W: 'E' };
     const r = resolvePlayerAction(state, { type: 'move', dir: back[from.d] });
 
-    expect(r.events.at(-1)).toEqual({ type: 'descended', floor: 2 });
+    expect(r.events.at(-1)).toEqual({ type: 'descended', floor: 2, hasTraining: false });
     expect(r.events.filter((e) => e.type === 'attacked')).toHaveLength(0);
   });
 
@@ -97,7 +102,8 @@ describe('descer de andar', () => {
     const player = getPlayer(state);
     player.hp = 99999;
     player.maxHp = 99999;
-    player.atk = 999; // mata tudo de um golpe pra não demorar
+    state.hero.trainedAtk = 999; // mata tudo de um golpe pra não demorar
+    refreshPlayerStats(state.hero, player);
     for (let f = 1; f <= FINAL_FLOOR; f++) walkToStairs(state);
     expect(state.status).toBe('won');
     expect(state.floor).toBe(FINAL_FLOOR);

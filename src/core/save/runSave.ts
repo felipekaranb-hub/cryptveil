@@ -1,3 +1,4 @@
+import { createKnightHero } from '../hero';
 import { RUN_STATE_VERSION, type RunState } from '../run';
 
 /**
@@ -13,11 +14,15 @@ export function serializeRun(state: RunState): string {
 /**
  * Migrações: versão antiga → objeto da versão seguinte, ou null pra descartar.
  * v1 (Marco 1, sala fixa) nunca foi salvo de verdade: descarta.
+ * v2 (Marco 2a) → v3: ganha o herói do Knight com o equipamento inicial
+ * (ATK/DEF efetivos são os mesmos do v2) e começa a contar salas do zero.
+ * Monstros já vivos no andar não dão XP/loot; os dos próximos andares, sim.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
 const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: () => null,
+  2: (old) => ({ ...old, version: 3, hero: createKnightHero(), visitedRooms: [], clearedRooms: [], prompt: null }),
 };
 
 /**
@@ -55,7 +60,11 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   if (!isRecord(map) || !Array.isArray(entities) || !Array.isArray(rng) || rng.length !== 4) return false;
   if (typeof map['width'] !== 'number' || typeof map['height'] !== 'number') return false;
   if (!Array.isArray(map['tiles']) || map['tiles'].length !== map['width'] * map['height']) return false;
-  if (!Array.isArray(v['rooms'])) return false;
+  if (!Array.isArray(v['rooms']) || !Array.isArray(v['visitedRooms']) || !Array.isArray(v['clearedRooms'])) {
+    return false;
+  }
+  const hero = v['hero'];
+  if (!isRecord(hero) || !Array.isArray(hero['bag']) || !isRecord(hero['equipment'])) return false;
   for (const key of ['seed', 'turn', 'floor'] as const) {
     if (typeof v[key] !== 'number') return false;
   }

@@ -1,3 +1,5 @@
+import type { ItemId } from './data/items';
+import type { SkillId } from './data/skills';
 import type { Point } from './grid';
 
 /**
@@ -16,6 +18,22 @@ export type CoreEvent =
   | { readonly type: 'died'; readonly entityId: string }
   | { readonly type: 'waited'; readonly entityId: string }
   /** Player pisou na escada: o RunState já está no andar novo (mapa e monstros trocados). */
-  | { readonly type: 'descended'; readonly floor: number }
+  | { readonly type: 'descended'; readonly floor: number; readonly hasTraining: boolean }
+  | { readonly type: 'skill-used'; readonly entityId: string; readonly skillId: SkillId }
+  | {
+      readonly type: 'healed';
+      readonly entityId: string;
+      readonly amount: number;
+      readonly hp: number;
+      readonly source: 'skill' | 'potion' | 'passive';
+    }
+  | { readonly type: 'mana-restored'; readonly amount: number; readonly mana: number }
+  | { readonly type: 'rewarded'; readonly xp: number; readonly gold: number }
+  | { readonly type: 'leveled-up'; readonly level: number }
+  /** Item foi pro inventário; `equipped` = vestiu na hora (era melhor que o do slot). */
+  | { readonly type: 'looted'; readonly itemId: ItemId; readonly equipped: boolean }
+  | { readonly type: 'room-cleared'; readonly explored: number; readonly trainingEarned: boolean }
+  | { readonly type: 'training-offered' }
+  | { readonly type: 'trained'; readonly stat: 'atk' | 'def'; readonly amount: number }
   | { readonly type: 'victory' }
   | { readonly type: 'defeat' };

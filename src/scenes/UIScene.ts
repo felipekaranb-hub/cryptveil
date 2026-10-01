@@ -26,8 +26,9 @@ export class UIScene extends Phaser.Scene {
   private subtitle!: Phaser.GameObjects.Text;
   private hpText!: Phaser.GameObjects.Text;
   private hpFill!: Phaser.GameObjects.Rectangle;
+  private manaText!: Phaser.GameObjects.Text;
+  private manaFill!: Phaser.GameObjects.Rectangle;
   private statsText!: Phaser.GameObjects.Text;
-  private clickText!: Phaser.GameObjects.Text;
   private padText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
@@ -50,17 +51,19 @@ export class UIScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, 22, 'CRYPTVEIL', style(28, TEXT_COLORS.ACCENT)).setOrigin(0.5, 0);
     this.subtitle = this.add
-      .text(GAME_WIDTH / 2, 56, 'Marco 2a', style(12, TEXT_COLORS.MUTED))
+      .text(GAME_WIDTH / 2, 56, 'Marco 2b', style(12, TEXT_COLORS.MUTED))
       .setOrigin(0.5, 0);
 
     // --- painel esquerdo: status do Knight
     this.drawPanel(LEFT_X, 'KNIGHT');
-    const y0 = MAP_VIEW.y + 32;
+    const y0 = MAP_VIEW.y + 28;
     this.hpText = this.add.text(LEFT_X + 12, y0, '', style(12));
-    this.add.rectangle(LEFT_X + 12, y0 + 22, HP_BAR_W, 8, 0x000000).setOrigin(0);
-    this.hpFill = this.add.rectangle(LEFT_X + 12, y0 + 22, HP_BAR_W, 8, COLORS.BLOOD_RED).setOrigin(0);
-    this.statsText = this.add.text(LEFT_X + 12, y0 + 44, '', style(12)).setLineSpacing(6);
-    this.clickText = this.add.text(LEFT_X + 12, MAP_VIEW.y + MAP_VIEW.height - 52, '', style(11, TEXT_COLORS.MUTED));
+    this.add.rectangle(LEFT_X + 12, y0 + 18, HP_BAR_W, 6, 0x000000).setOrigin(0);
+    this.hpFill = this.add.rectangle(LEFT_X + 12, y0 + 18, HP_BAR_W, 6, COLORS.BLOOD_RED).setOrigin(0);
+    this.manaText = this.add.text(LEFT_X + 12, y0 + 30, '', style(12));
+    this.add.rectangle(LEFT_X + 12, y0 + 48, HP_BAR_W, 6, 0x000000).setOrigin(0);
+    this.manaFill = this.add.rectangle(LEFT_X + 12, y0 + 48, HP_BAR_W, 6, COLORS.MANA_BLUE).setOrigin(0);
+    this.statsText = this.add.text(LEFT_X + 12, y0 + 64, '', style(11)).setLineSpacing(4);
     this.padText = this.add.text(LEFT_X + 12, MAP_VIEW.y + MAP_VIEW.height - 32, '', style(11, TEXT_COLORS.MUTED));
 
     // --- painel direito: log de combate
@@ -72,10 +75,19 @@ export class UIScene extends Phaser.Scene {
       })
       .setLineSpacing(4);
 
+    // Hotbar provisória (Marco 3: hotbar de verdade, com mapeamento no controle)
     this.add
       .text(
         GAME_WIDTH / 2,
-        GAME_HEIGHT - 28,
+        GAME_HEIGHT - 44,
+        '1 Brutal Strike (5)  ·  2 Berserk (10)  ·  3 Whirlwind Throw (8)  ·  4 Wound Cleansing (10)  ·  5 Poção HP  ·  6 Poção Mana',
+        style(11, TEXT_COLORS.ACCENT),
+      )
+      .setOrigin(0.5);
+    this.add
+      .text(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT - 24,
         'WASD/Setas ou D-pad: mover e atacar  ·  Espaço / X: passar turno  ·  Enter / A: confirmar',
         style(11, TEXT_COLORS.MUTED),
       )
@@ -93,7 +105,8 @@ export class UIScene extends Phaser.Scene {
     onGameEvent(events, 'player-status', this.onPlayerStatus, this);
     onGameEvent(events, 'log', this.onLog, this);
     onGameEvent(events, 'run-ended', this.onRunEnded, this);
-    onGameEvent(events, 'tile-clicked', this.onTileClicked, this);
+    onGameEvent(events, 'training-prompt', this.onTrainingPrompt, this);
+    onGameEvent(events, 'training-closed', this.onTrainingClosed, this);
 
     // HUD em coordenadas lógicas 960×540, desenhado na resolução real
     bindRenderScale(this, (scale) =>
@@ -106,7 +119,8 @@ export class UIScene extends Phaser.Scene {
       offGameEvent(events, 'player-status', this.onPlayerStatus, this);
       offGameEvent(events, 'log', this.onLog, this);
       offGameEvent(events, 'run-ended', this.onRunEnded, this);
-      offGameEvent(events, 'tile-clicked', this.onTileClicked, this);
+      offGameEvent(events, 'training-prompt', this.onTrainingPrompt, this);
+      offGameEvent(events, 'training-closed', this.onTrainingClosed, this);
     });
   }
 
@@ -134,12 +148,12 @@ export class UIScene extends Phaser.Scene {
   // ------------------------------------------------------------------ eventos
 
   private onRunStarted({ seed }: GameEvents['run-started']): void {
-    this.subtitle.setText(`Marco 2a  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2b  ·  seed ${seed}`);
     this.overlay.setVisible(false);
   }
 
   private onResumeOffered({ seed, floor, turn }: GameEvents['resume-offered']): void {
-    this.subtitle.setText(`Marco 2a  ·  seed ${seed}`);
+    this.subtitle.setText(`Marco 2b  ·  seed ${seed}`);
     this.overlayTitle.setText('RUN SUSPENSA').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
     this.overlaySub.setText(
       `Andar ${floor}  ·  turno ${turn}\n\nEnter / A: continuar\nEsc / B: nova run`,
@@ -147,10 +161,38 @@ export class UIScene extends Phaser.Scene {
     this.overlay.setVisible(true);
   }
 
-  private onPlayerStatus({ hp, maxHp, atk, def, turn, floor }: GameEvents['player-status']): void {
-    this.hpText.setText(`HP ${hp}/${maxHp}`);
-    this.hpFill.width = Math.round(HP_BAR_W * Math.max(0, hp / maxHp));
-    this.statsText.setText(`Andar ${floor}\nATK ${atk}\nDEF ${def}\nTurno ${turn}`);
+  private onPlayerStatus(s: GameEvents['player-status']): void {
+    this.hpText.setText(`HP ${s.hp}/${s.maxHp}`);
+    this.hpFill.width = Math.round(HP_BAR_W * Math.max(0, s.hp / s.maxHp));
+    this.manaText.setText(`Mana ${s.mana}/${s.maxMana}`);
+    this.manaFill.width = Math.round(HP_BAR_W * Math.max(0, s.mana / s.maxMana));
+    this.statsText.setText(
+      [
+        `Nível ${s.level}  ·  XP ${s.xp}/${s.xpNext}`,
+        `Gold ${s.gold}`,
+        `ATK ${s.atk}   DEF ${s.def}`,
+        `Andar ${s.floor}  ·  Turno ${s.turn}`,
+        '',
+        `Poções  HP ${s.potions.hp}  ·  Mana ${s.potions.mana}`,
+        '',
+        `Arma    ${s.gear.weapon}`,
+        `Armad.  ${s.gear.armor}`,
+        `Elmo    ${s.gear.helmet}`,
+        `Escudo  ${s.gear.shield}`,
+      ].join('\n'),
+    );
+  }
+
+  private onTrainingPrompt({ selected }: GameEvents['training-prompt']): void {
+    const atk = selected === 0 ? '> +2 ATK <' : '  +2 ATK  ';
+    const def = selected === 1 ? '> +2 DEF <' : '  +2 DEF  ';
+    this.overlayTitle.setText('TRAINING ROOM').setColor(TEXT_COLORS.ACCENT).setFontSize(28);
+    this.overlaySub.setText(`${atk}      ${def}\n\n←/→ escolher  ·  Enter / A: confirmar\nEscolha única`);
+    this.overlay.setVisible(true);
+  }
+
+  private onTrainingClosed(): void {
+    this.overlay.setVisible(false);
   }
 
   private onLog({ lines }: GameEvents['log']): void {
@@ -167,10 +209,6 @@ export class UIScene extends Phaser.Scene {
       .setColor(won ? TEXT_COLORS.ACCENT : '#c0392b');
     this.overlaySub.setText(`${turns} turnos  ·  Enter / A: nova run`);
     this.overlay.setVisible(true);
-  }
-
-  private onTileClicked({ tile }: GameEvents['tile-clicked']): void {
-    this.clickText.setText(`Tile ${tile.x},${tile.y}`);
   }
 
   private updatePadStatus(): void {

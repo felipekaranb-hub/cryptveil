@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import type { Action } from '../core/actions';
 import { getTile, TileType } from '../core/dungeon/DungeonMap';
 import type { CoreEvent } from '../core/events';
+import { getItem, type ItemId } from '../core/data/items';
 import { DIRECTIONS, inBounds, step } from '../core/grid';
+import { countInBag, xpToNextLevel } from '../core/hero';
 import { randomSeed } from '../core/rng';
 import { createRun, getEntity, getPlayer, type RunState } from '../core/run';
 import { resolvePlayerAction } from '../core/turn/TurnManager';
@@ -12,7 +14,7 @@ import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { worldToTile } from '../view/coords';
 import { EntityView } from '../view/EntityView';
 import { emitGameEvent } from '../view/events';
-import { formatEvent } from '../view/format';
+import { formatEvent, formatFailure } from '../view/format';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 interface GameSceneData {
@@ -30,6 +32,8 @@ export class GameScene extends Phaser.Scene {
   private mode: 'playing' | 'resume-offer' = 'playing';
   private readonly views = new Map<string, EntityView>();
   private mapGraphics: Phaser.GameObjects.Graphics | null = null;
+  /** Opção destacada no prompt da Training Room (0 = +ATK, 1 = +DEF). */
+  private trainingChoice = 0;
   private controls!: InputController;
   private clickMarker!: Phaser.GameObjects.Rectangle;
 
@@ -49,6 +53,7 @@ export class GameScene extends Phaser.Scene {
     this.state = suspended ?? createRun(data.seed ?? urlSeed ?? randomSeed());
     this.views.clear();
     this.mapGraphics = null;
+    this.trainingChoice = 0;
   }
 
   create(): void {
@@ -88,7 +93,7 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(0, () => {
       const { seed, floor, turn } = this.state;
       if (this.mode === 'resume-offer') emitGameEvent(this.game.events, 'resume-offered', { seed, floor, turn });
-      else emitGameEvent(this.game.events, 'run-started', { seed });
+      else this.startPlaying();
       this.emitPlayerStatus();
     });
   }
@@ -101,11 +106,10 @@ export class GameScene extends Phaser.Scene {
 
   /** (Re)desenha o andar atual: mapa, entidades e limites da câmera. */
   private buildFloor(): void {
-    this.mapGraphics?.destroy();
     for (const view of this.views.values()) view.destroy();
     this.views.clear();
 
-    this.mapGraphics = this.drawMap();
+    this.redrawMap();
     for (const entity of this.state.entities) {
       this.views.set(entity.id, new EntityView(this, entity));
     }
@@ -131,6 +135,11 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  private redrawMap(): void {
+    this.mapGraphics?.destroy();
+    this.mapGraphics = this.drawMap();
+  }
+
   private drawMap(): Phaser.GameObjects.Graphics {
     const { map } = this.state;
     const g = this.add.graphics();
@@ -154,6 +163,15 @@ export class GameScene extends Phaser.Scene {
           // Degraus provisórios até os sprites do Marco 6
           g.fillStyle(TILE_COLORS.STAIRS_STEP, 1);
           for (let i = 0; i < 4; i++) g.fillRect(px + 4 + i * 3, py + 6 + i * 6, TILE_SIZE - 8 - i * 6, 3);
+        } else if (tile === TileType.TRAINING) {
+          // Altar de treino provisório: quadrado roxo com moldura dourada
+          g.fillStyle(TILE_COLORS.TRAINING, 1);
+          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          g.lineStyle(2, TILE_COLORS.TRAINING_MARK, 1);
+          g.strokeRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+          g.fillStyle(TILE_COLORS.TRAINING_MARK, 1);
+          g.fillRect(px + 13, py + 9, 6, 14);
+          g.fillRect(px + 9, py + 13, 14, 6);
         } else {
           const light = (x + y) % 2 === 0;
           g.fillStyle(light ? TILE_COLORS.FLOOR_LIGHT : TILE_COLORS.FLOOR_DARK, 1);
@@ -170,7 +188,7 @@ export class GameScene extends Phaser.Scene {
     if (this.mode === 'resume-offer') {
       if (action.type === 'confirm') {
         this.mode = 'playing';
-        emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
+        this.startPlaying();
       } else if (action.type === 'cancel') {
         clearRun();
         this.restartRun();
@@ -184,11 +202,45 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.state.prompt === 'training') {
+      this.handleTrainingInput(action);
+      return;
+    }
+
     const result = resolvePlayerAction(this.state, action);
-    if (!result.tookTurn) return; // parede, ação sem efeito: nada muda
+    if (!result.tookTurn) {
+      // Parede fica quieta; skill sem mana/alvo avisa no LOG
+      const warning = formatFailure(result);
+      if (warning) emitGameEvent(this.game.events, 'log', { lines: [warning] });
+      return;
+    }
 
     this.playEvents(result.events);
     this.emitPlayerStatus();
+  }
+
+  /** Training Room: ←/→ escolhe, Enter/A confirma. O core só recebe a escolha final. */
+  private handleTrainingInput(action: Action): void {
+    if (action.type === 'move' && (action.dir === 'W' || action.dir === 'E')) {
+      this.trainingChoice = action.dir === 'W' ? 0 : 1;
+      emitGameEvent(this.game.events, 'training-prompt', { selected: this.trainingChoice });
+      return;
+    }
+    if (action.type !== 'confirm') return;
+    const result = resolvePlayerAction(this.state, { type: 'choose', index: this.trainingChoice });
+    this.playEvents(result.events);
+    this.emitPlayerStatus();
+  }
+
+  /** Começa (ou retoma) o jogo: some o overlay e reabre um prompt pendente do save. */
+  private startPlaying(): void {
+    emitGameEvent(this.game.events, 'run-started', { seed: this.state.seed });
+    if (this.state.prompt === 'training') this.openTrainingPrompt();
+  }
+
+  private openTrainingPrompt(): void {
+    this.trainingChoice = 0;
+    emitGameEvent(this.game.events, 'training-prompt', { selected: 0 });
   }
 
   /** Aplica os eventos do core na tela, na ordem. */
@@ -216,6 +268,23 @@ export class GameScene extends Phaser.Scene {
         case 'died':
           this.views.get(event.entityId)?.die();
           break;
+        case 'healed':
+          this.views.get(event.entityId)?.setHp(event.hp, getEntity(this.state, event.entityId)?.maxHp ?? event.hp);
+          if (event.source !== 'passive') this.views.get(event.entityId)?.flashHeal();
+          break;
+        case 'leveled-up': {
+          const p = getPlayer(this.state);
+          this.views.get(p.id)?.setHp(p.hp, p.maxHp);
+          this.views.get(p.id)?.flashHeal();
+          break;
+        }
+        case 'training-offered':
+          this.openTrainingPrompt();
+          break;
+        case 'trained':
+          this.redrawMap(); // o altar vira chão
+          emitGameEvent(this.game.events, 'training-closed', {});
+          break;
         case 'descended':
           // O core já trocou mapa e monstros: redesenha tudo e suspende a run
           this.buildFloor();
@@ -232,6 +301,11 @@ export class GameScene extends Phaser.Scene {
           });
           break;
         case 'waited':
+        case 'skill-used':
+        case 'mana-restored':
+        case 'rewarded':
+        case 'looted':
+        case 'room-cleared':
           break;
       }
     }
@@ -240,13 +314,28 @@ export class GameScene extends Phaser.Scene {
 
   private emitPlayerStatus(): void {
     const p = getPlayer(this.state);
+    const { hero } = this.state;
+    const itemName = (id: ItemId | undefined): string => (id ? getItem(id).name : '—');
     emitGameEvent(this.game.events, 'player-status', {
       hp: p.hp,
       maxHp: p.maxHp,
+      mana: hero.mana,
+      maxMana: hero.maxMana,
       atk: p.atk,
       def: p.def,
+      level: hero.level,
+      xp: hero.xp,
+      xpNext: xpToNextLevel(hero.level),
+      gold: hero.gold,
       turn: this.state.turn,
       floor: this.state.floor,
+      potions: { hp: countInBag(hero, 'hpPotion'), mana: countInBag(hero, 'manaPotion') },
+      gear: {
+        weapon: itemName(hero.equipment.weapon),
+        armor: itemName(hero.equipment.armor),
+        helmet: itemName(hero.equipment.helmet),
+        shield: itemName(hero.equipment.shield),
+      },
     });
   }
 

@@ -6,6 +6,8 @@ export const TileType = {
   WALL: 1,
   /** Escada pra baixo: pisar nela desce de andar. */
   STAIRS: 2,
+  /** Centro da Training Room: pisar oferece +2 ATK ou +2 DEF, uma vez. */
+  TRAINING: 3,
 } as const;
 export type TileType = (typeof TileType)[keyof typeof TileType];
 
@@ -21,7 +23,7 @@ export function getTile(map: DungeonMap, p: Point): TileType {
   return map.tiles[p.y * map.width + p.x] ?? TileType.WALL;
 }
 
-/** Fora do mapa conta como parede. Escada é chão (dá pra pisar). */
+/** Fora do mapa conta como parede. Escada e Training são chão (dá pra pisar). */
 export function isWalkable(map: DungeonMap, p: Point): boolean {
   return getTile(map, p) !== TileType.WALL;
 }

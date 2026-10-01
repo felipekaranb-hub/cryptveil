@@ -1,24 +1,27 @@
 import type { Action } from '../actions';
 import { AI_STRATEGIES, type AiRegistry, type EnemyIntent } from '../ai/strategies';
-import { rollDamage } from '../combat/damage';
-import { FINAL_FLOOR } from '../balance';
+import { FINAL_FLOOR, MANA_REGEN_EVERY_TURNS } from '../balance';
 import { getTile, isWalkable, TileType } from '../dungeon/DungeonMap';
 import { isAlive, type Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
 import { step, type Direction } from '../grid';
 import { Rng } from '../rng';
 import { enterNextFloor, entityAt, getPlayer, livingEnemies, type RunState } from '../run';
+import { attack } from './combat';
+import { applyTrainingChoice, updateRoomProgress } from './rooms';
+import { useHotbarSlot, type HotbarFailure } from './skills';
+
+/** Por que a ação não gastou turno. */
+export type TurnFailure = 'wall' | 'not-playing' | 'awaiting-choice' | HotbarFailure;
 
 /**
  * Resultado de uma ação do jogador (discriminated union).
- * tookTurn: false → nada mudou e os inimigos não agiram.
+ * - tookTurn: false + reason → nada mudou e os inimigos não agiram.
+ * - 'free-action' → mudou o estado (escolha da Training Room) sem gastar turno.
  */
 export type TurnResult =
-  | {
-      readonly tookTurn: false;
-      readonly reason: 'wall' | 'not-playing' | 'not-a-turn-action';
-      readonly events: readonly CoreEvent[];
-    }
+  | { readonly tookTurn: false; readonly reason: TurnFailure; readonly events: readonly CoreEvent[] }
+  | { readonly tookTurn: false; readonly reason: 'free-action'; readonly events: readonly CoreEvent[] }
   | { readonly tookTurn: true; readonly events: readonly CoreEvent[] };
 
 /**
@@ -33,37 +36,56 @@ export function resolvePlayerAction(
   action: Action,
   ai: AiRegistry = AI_STRATEGIES,
 ): TurnResult {
-  if (state.status !== 'playing') return { tookTurn: false, reason: 'not-playing', events: [] };
+  if (state.status !== 'playing') return fail('not-playing');
+
+  const events: CoreEvent[] = [];
+
+  // Prompt aberto (Training Room): só a escolha passa, e ela não gasta turno
+  if (state.prompt === 'training') {
+    if (action.type !== 'choose') return fail('awaiting-choice');
+    if (!applyTrainingChoice(state, action.index, events)) return fail('not-a-turn-action');
+    return { tookTurn: false, reason: 'free-action', events };
+  }
 
   const rng = Rng.fromState(state.rngState);
-  const events: CoreEvent[] = [];
   const player = getPlayer(state);
 
   // --- vez do jogador
   switch (action.type) {
     case 'move': {
       const acted = moveOrAttack(state, player, action.dir, rng, events);
-      if (!acted) return { tookTurn: false, reason: 'wall', events: [] };
+      if (!acted) return fail('wall');
+      state.hero.facing = action.dir;
       break;
     }
     case 'wait':
       events.push({ type: 'waited', entityId: player.id });
       break;
+    case 'skill': {
+      const used = useHotbarSlot(state, action.slot, rng, events);
+      if (used !== true) return fail(used);
+      break;
+    }
     default:
-      // Skills, inventário etc. chegam no Marco 2/3
-      return { tookTurn: false, reason: 'not-a-turn-action', events: [] };
+      // Inventário etc. chegam no Marco 3
+      return fail('not-a-turn-action');
   }
 
-  if (getTile(state.map, player.pos) === TileType.STAIRS) {
+  const tile = getTile(state.map, player.pos);
+  if (tile === TileType.STAIRS) {
     // Escada: desce na hora e os monstros do andar velho não agem.
     // A escada do andar final termina a run (Marco 4: Orc Warlord antes dela).
     if (state.floor >= FINAL_FLOOR) {
       finish(state, 'won', events);
     } else {
-      enterNextFloor(state, rng);
-      events.push({ type: 'descended', floor: state.floor });
+      const hasTraining = enterNextFloor(state, rng);
+      events.push({ type: 'descended', floor: state.floor, hasTraining });
     }
   } else {
+    if (tile === TileType.TRAINING) {
+      state.prompt = 'training';
+      events.push({ type: 'training-offered' });
+    }
     // --- vez dos inimigos, na ordem da lista
     for (const enemy of livingEnemies(state)) {
       const strategy = enemy.ai ? ai[enemy.ai] : undefined;
@@ -74,11 +96,19 @@ export function resolvePlayerAction(
         break;
       }
     }
+    if (state.status === 'playing') updateRoomProgress(state, events);
   }
 
   state.turn += 1;
+  if (state.turn % MANA_REGEN_EVERY_TURNS === 0) {
+    state.hero.mana = Math.min(state.hero.maxMana, state.hero.mana + 1);
+  }
   state.rngState = rng.getState();
   return { tookTurn: true, events };
+}
+
+function fail(reason: TurnFailure): TurnResult {
+  return { tookTurn: false, reason, events: [] };
 }
 
 /**
@@ -96,7 +126,7 @@ function moveOrAttack(
   const occupant = entityAt(state, target);
   if (occupant) {
     if (occupant.kind === actor.kind) return false; // não ataca aliado
-    attack(actor, occupant, rng, events);
+    attack(state, actor, occupant, 1, rng, events);
     return true;
   }
   if (!isWalkable(state.map, target)) return false;
@@ -104,19 +134,6 @@ function moveOrAttack(
   actor.pos = target;
   events.push({ type: 'moved', entityId: actor.id, from, to: target });
   return true;
-}
-
-function attack(attacker: Entity, target: Entity, rng: Rng, events: CoreEvent[]): void {
-  const damage = rollDamage(attacker.atk, target.def, rng);
-  target.hp = Math.max(0, target.hp - damage);
-  events.push({
-    type: 'attacked',
-    attackerId: attacker.id,
-    targetId: target.id,
-    damage,
-    targetHp: target.hp,
-  });
-  if (target.hp === 0) events.push({ type: 'died', entityId: target.id });
 }
 
 function applyEnemyIntent(
@@ -129,7 +146,7 @@ function applyEnemyIntent(
   switch (intent.type) {
     case 'attack': {
       const target = state.entities.find((e) => e.id === intent.targetId);
-      if (target && isAlive(target)) attack(enemy, target, rng, events);
+      if (target && isAlive(target)) attack(state, enemy, target, 1, rng, events);
       return;
     }
     case 'move':

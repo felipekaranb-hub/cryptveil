@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 2a). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 01/10/2026 (Marco 2b). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -142,7 +142,8 @@ cryptveil/
     │   ├── grid.ts            # Point, Direction, step, manhattan, neighbors4
     │   ├── rng.ts             # Rng com seed
     │   ├── combat/damage.ts   # Fórmula de dano
-    │   ├── events.ts          # CoreEvent (moved, attacked, died, waited, descended, victory, defeat)
+    │   ├── events.ts          # CoreEvent (combate, descended, skill-used, healed, rewarded, looted, room-cleared, trained…)
+    │   ├── hero.ts            # HeroState: mana, XP/level, gold, equipamento, inventário, Training Room
     │   ├── pathfinding.ts     # BFS 4-direções (bfsFirstStep)
     │   ├── run.ts             # RunState serializável, createRun, enterNextFloor, createTestRun, consultas
     │   ├── ai/strategies.ts   # AiStrategy, chase, registro AI_STRATEGIES (injetado por id)
@@ -150,10 +151,10 @@ cryptveil/
     │   ├── dungeon/           # DungeonMap, TileType, Room, DungeonGenerator (BSP), populate (monstros)
     │   ├── save/runSave.ts    # RunState ↔ texto, versão e migração (suspender automático)
     │   ├── entities/Entity.ts # Entidade como dado puro
-    │   ├── turn/TurnManager.ts# resolvePlayerAction → TurnResult + eventos
-    │   ├── (M2b) items/       # Item, Inventory, LootTable
+    │   ├── turn/              # TurnManager (resolvePlayerAction), combat, skills (+poções), rewards, rooms (sala explorada/Training)
+    │   ├── items/             # Item (canEquip), Inventory (auto-equip), LootTable
     │   ├── (M5) meta/         # MetaProgress, Sanctum, Bestiary
-    │   └── (M2b+) data/       # enemies.ts, items.ts, relics.ts, skills.ts
+    │   └── data/              # entities, items, lootTables, skills (+hotbar) — (M4) relics
     ├── input/InputController.ts
     ├── storage/runStorage.ts  # LocalStorage da run suspensa (try/catch: storage bloqueado não derruba o jogo)
     ├── scenes/                # BootScene, GameScene (mundo), UIScene (HUD), (M5) HubScene, GameOverScene
@@ -189,8 +190,16 @@ Decisões tomadas:
 - Save: gravado ao descer e no `visibilitychange`; "Nova run" (Esc/B) na tela de "Continuar" apaga a suspensa; vitória e morte apagam.
 - Sem regen de HP no 2a (a cura e a passiva entram no 2b): descer os 5 andares agora é difícil de propósito.
 
-#### Marco 2b — O Knight
-Item/Inventory/LootTable (itens do Knight da §2.4, chances provisórias), 4 skills com mana, passiva +2 HP por kill, XP/level, gold por kill, Training Room. Decisões já fechadas na §7.
+#### ✅ Marco 2b — O Knight (entregue em 01/10/2026)
+Item/Inventory/LootTable, 4 skills com mana, passiva +2 HP por kill, XP/level, gold por kill, poções, salas exploradas e Training Room. `RunState` v3 (`hero`, `visitedRooms`, `clearedRooms`, `prompt`) com migração do save v2. Painel do Knight com HP/Mana/Nível/XP/Gold/poções/equipamento. 189 testes.
+Decisões tomadas (além das da §7):
+- **Loot vai direto pro inventário** (sem item no chão no MVP) e **auto-equip** se o item serve na vocação e soma mais ATK+DEF que o do slot; o antigo vai pro inventário. Provisório até a InventoryUI do Marco 3.
+- **Alvo das skills:** o Knight guarda a direção do último passo/ataque (`facing`). Brutal Strike e Whirlwind Throw preferem o inimigo nessa direção, senão o primeiro na ordem N, S, E, W. Sem alvo, sem mana ou HP cheio → não gasta mana nem turno, e o LOG avisa.
+- **Hotbar fixa:** 1 Brutal Strike · 2 Berserk · 3 Whirlwind Throw · 4 Wound Cleansing · 5 Poção HP · 6 Poção Mana. Usar poção gasta o turno. No controle as skills ainda não têm botão (Marco 3).
+- **Training Room:** uma sala do andar (nem a inicial, nem a da escada), sem monstros, com um altar no centro. Pisar abre a escolha (←/→ + Enter/A); o turno trava até escolher, a escolha não gasta turno e o altar vira chão. Ganhar mais de uma de uma vez → uma por andar.
+- Knight base ATK 7 + Sword (+3) = ATK 10 (o mesmo do Marco 1). DEF dos itens baixa de propósito (§2.12).
+- Goblin provisório agora +3 ATK por andar (era +2), + XP, gold e loot por andar (`placeholderFloor1..3`, usando as chances da §2.4 dos monstros que vão morar ali).
+- **Simulação headless** (bot simples: luta com o que encontra, cura abaixo de 50%, poção abaixo de 30%, 60 seeds): vence 27%, 32% morrem no andar 1, nível médio 2,6, DEF média 7,7. Base pro balanceamento do Marco 6.
 
 ### Marco 3 — UI completa
 HUD (HP/Mana, stats, equipamento de 8 slots + 3 relíquias), BattleLog lendo os eventos do core, hotbar 1–8 (**+ mapeamento no controle**), InventoryUI (Equipado/Pra vender), MiniMap + fog of war (`Set` de `pointKey` por andar).
@@ -228,8 +237,8 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
     - **XP:** o próximo nível custa `20 × nível atual` (20, 40, 60…). XP de cada monstro no template.
     - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.
     - Itens do Marco 2 = só os do Knight da §2.4 com chances provisórias. Inventário sem limite de slots no MVP. Gold fica no `RunState`; conversão em meta só no Marco 5.
-  - [ ] Marco 2b: o que é "sala explorada" na Training Room (explicado de novo ao Felipe; aguardando).
-  - [ ] Marco 2b ou 4: **poções** (o Felipe gostou da ideia; falta decidir quais e quando entram).
+  - [x] **Sala explorada** (Marco 2b): o player entrou nela **e** todos os monstros que nasceram nela morreram (sala vazia conta ao entrar). A cada 5, o próximo andar ganha uma Training Room.
+  - [x] **Poções** (Marco 2b), drop de qualquer monstro, sorteio separado do loot: **HP** 5% de chance, cura 50% do HP max (decisão do Felipe). **Mana** 8% de chance, restaura 50% da mana max: mais comum e mais fraca porque a mana já regenera (1 a cada 2 turnos ≈ 70 por andar) e 15 de mana ≈ 1,5 Wound Cleansing ≈ 19 HP, menos que a poção de HP. Preço na loja: Marco 4.
   - [ ] Marco 4: loot tables completas (só as chances do Knight na §2.4 existem), stats de Rat/Skeleton/Goblin/Orc, preços dos itens, as 2 relíquias do MVP.
   - [ ] Marco 5: custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; taxa de conversão de gold no fim da run.
 - [x] Passar o turno: Espaço / X (Marco 1).

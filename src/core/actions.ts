@@ -12,6 +12,8 @@ export type Action =
   | { readonly type: 'wait' }
   | { readonly type: 'skill'; readonly slot: SkillSlot }
   | { readonly type: 'inventory' }
+  /** Escolha num prompt do core (Training Room: 0 = +ATK, 1 = +DEF). */
+  | { readonly type: 'choose'; readonly index: number }
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' };
 
@@ -25,6 +27,8 @@ export function describeAction(a: Action): string {
       return `skill ${a.slot}`;
     case 'inventory':
       return 'inventory';
+    case 'choose':
+      return `choose ${a.index}`;
     case 'confirm':
       return 'confirm';
     case 'cancel':

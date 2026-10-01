@@ -59,9 +59,18 @@ export class EntityView {
     this.hpFill.fillColor = ratio > 0.5 ? COLORS.HP_GREEN : ratio > 0.25 ? COLORS.HP_YELLOW : COLORS.HP_RED;
   }
 
+  /** Pisca verde ao curar. */
+  flashHeal(): void {
+    this.flashColor(COLORS.HP_GREEN);
+  }
+
   /** Pisca branco ao levar dano. */
   flash(): void {
-    this.body.fillColor = 0xffffff;
+    this.flashColor(0xffffff);
+  }
+
+  private flashColor(color: number): void {
+    this.body.fillColor = color;
     this.scene.time.delayedCall(90, () => {
       if (this.body.active) this.body.fillColor = this.baseColor;
     });

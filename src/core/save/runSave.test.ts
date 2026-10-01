@@ -50,3 +50,17 @@ describe('save da run', () => {
     expect(deserializeRun(JSON.stringify(noPlayer))).toBeNull();
   });
 });
+
+describe('migração do save', () => {
+  it('save v2 (Marco 2a) vira v3 com o herói inicial e continua jogável', () => {
+    const v3 = createRun(48213);
+    const { hero: _hero, visitedRooms: _v, clearedRooms: _c, prompt: _p, ...rest } = v3;
+    const v2 = { ...rest, version: 2 };
+    const migrated = deserializeRun(JSON.stringify(v2));
+    expect(migrated).not.toBeNull();
+    expect(migrated!.version).toBe(3);
+    expect(migrated!.hero.equipment).toEqual({ weapon: 'sword' });
+    expect(migrated!.clearedRooms).toEqual([]);
+    expect(resolvePlayerAction(migrated!, { type: 'wait' }).tookTurn).toBe(true);
+  });
+});
