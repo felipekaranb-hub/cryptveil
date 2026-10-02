@@ -6,7 +6,7 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 ## Onde estamos (atualizado em 02/10/2026)
 
 - **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário) 6a (balanceamento: DEF em porcentagem, bot sem meta ~14%) e 6b (sprites Kenney Tiny Dungeon + próprios, movimento animado, fonte VT323, sons sintetizados, mudo). Tudo publicado na `main`. **O MVP está completo.**
-- **Próximo:** o Felipe joga e valida. Depois, pós-MVP (§5 do handoff: classes, andares 6–15, monstros novos, música). Apresentar o plano antes.
+- **Próximo:** MVP validado pelo Felipe (dificuldade aprovada em 02/10/2026). Escolher o primeiro bloco do pós-MVP (§5 do handoff: classes, andares 6–15, monstros novos, música). Apresentar o plano antes.
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)

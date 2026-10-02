@@ -325,7 +325,7 @@ Ajustes (todos medidos na simulação, 200 seeds; ruído de ±3 pontos entre rod
 
 - **Efeito colateral:** como o bot morre mais cedo, a renda de gold caiu (~78g por run sem meta). O Sanctum (2.490g) fica ainda mais longo de completar; o Felipe decidiu manter os preços por ora (3C).
 
-#### ✅ Ajuste pós-6b — Dificuldade (02/10/2026, em teste pelo Felipe)
+#### ✅ Ajuste pós-6b — Dificuldade (02/10/2026, validado pelo Felipe: "dificuldade satisfatória, o jogo está divertido")
 Feedback do Felipe jogando: "ainda fácil; cheguei no boss com mana pra spammar Berserk e matar todos". Causa: o level up enchia +10 de mana, cada kill rendia +4 (~120 de mana no andar 5) e o Berserk acerta o boss e os Orcs invocados juntos. Das opções (A mana mais apertada, B boss resiste a área, C recarga nas skills, D boss mais forte) o Felipe escolheu **A + C + D pra testar**:
 - **A)** O level up **só aumenta a mana máxima** (não enche mais) e a **mana por kill caiu de 4 pra 3**.
 - **C)** **Recarga nas skills** (`SKILL_COOLDOWNS` em `balance.ts`, em turnos do player: usou no turno t, volta no t + N): Brutal Strike 0 (golpe base), **Berserk 3**, Whirlwind Throw 2, Wound Cleansing 5. Muda a decisão do Marco 2 ("sem cooldown, só mana"). A hotbar mostra "espera N" em vermelho; tentar usar recarregando não gasta mana nem turno. `RunState` v8 (`hero.cooldowns`) com migração do v7.
@@ -381,7 +381,7 @@ Só view: o core, o save e a simulação não mudaram. 277 testes.
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
 - [x] Empilhamento de DEF (§2.12): resolvido no Marco 6a com a redução percentual.
-- [x] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** Endurecida no Marco 6a (bot sem meta de 41% pra ~14%). Falta o Felipe confirmar jogando.
+- [x] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** Endurecida no Marco 6a e no ajuste pós-6b (mana, recarga, boss). Validada pelo Felipe jogando em 02/10/2026.
 - [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6.
 - [ ] Custo total do Sanctum (2.490g) vs. renda de gold por run: provavelmente runs demais pra completar. O Felipe manteve os preços no 6a; revisar quando ele jogar mais.
 - [ ] **Sprites que faltam** (desenhar no estilo do Tiny Dungeon quando precisar): ícones das skills na hotbar; itens de slots que ainda não têm item no jogo (perneira, botas, anel, amuleto); monstros pós-MVP (Dragon, Lich, Vampire, Demon). O Ghost do §2.9 já tem sprite no pack (121).
