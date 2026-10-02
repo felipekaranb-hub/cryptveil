@@ -89,9 +89,11 @@ describe('TurnManager', () => {
     const r = resolvePlayerAction(state, WAIT);
     const hit = r.events.find((e) => e.type === 'attacked' && e.attackerId === 'goblin-1');
     expect(hit).toBeDefined();
-    // Goblin ATK 3 → faixa 2–4, menos DEF 5 → sempre o piso de 1
-    if (hit?.type === 'attacked') expect(hit.damage).toBe(1);
-    expect(getPlayer(state).hp).toBe(49);
+    // Goblin ATK 3 → faixa 2–4, × 20/25 (DEF 5) → 2 a 3
+    if (hit?.type !== 'attacked') throw new Error('sem ataque');
+    expect(hit.damage).toBeGreaterThanOrEqual(2);
+    expect(hit.damage).toBeLessThanOrEqual(3);
+    expect(getPlayer(state).hp).toBe(50 - hit.damage);
   });
 
   it('Knight mata o Goblin dummy e a run continua (vitória só na escada final)', () => {

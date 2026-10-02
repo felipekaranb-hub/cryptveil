@@ -1,5 +1,5 @@
 import type { Action, SkillSlot } from '../actions';
-import { damageRange } from '../combat/damage';
+import { damageRange, mitigate } from '../combat/damage';
 import type { CardId } from '../data/cards';
 import { isWalkable, TileType } from '../dungeon/DungeonMap';
 import type { CoreEvent } from '../events';
@@ -123,7 +123,7 @@ function botTurn(state: RunState, act: (a: Action) => boolean): void {
 
   const target = adjacent[0];
   if (target) {
-    const basicMax = damageRange(p.atk).max - target.def;
+    const basicMax = mitigate(damageRange(p.atk).max, target.def);
     if (target.hp > basicMax && hero.mana >= 15 && skill(1)) return;
     const dir = DIRECTIONS.find((d) => pointKey(step(p.pos, d)) === pointKey(target.pos));
     if (dir && act({ type: 'move', dir })) return;

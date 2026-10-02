@@ -9,6 +9,14 @@ export const DAMAGE_VARIANCE = 0.25;
 /** Piso de dano: nenhum ataque que acerta dá menos que isso (evita lockout). */
 export const MIN_DAMAGE = 1;
 
+/**
+ * Redução de dano pela DEF (Marco 6a, decisão do Felipe, opção A): o dano é
+ * multiplicado por K / (K + DEF). Com K = 20: DEF 5 corta 20%, DEF 15 corta
+ * ~43%, DEF 20 corta 50%. Nunca zera — substitui a subtração do v2, em que a
+ * DEF empilhada deixava Skeleton e Orc batendo 1 no fim da região (§2.12).
+ */
+export const DEF_MITIGATION_K = 20;
+
 // --------------------------------------------------------------- run e andares
 
 /** Andar final. Descer a escada dele termina a run (Marco 4: lá mora o Orc Warlord). */
@@ -38,7 +46,7 @@ export const FLOOR_SPAWNS: Readonly<
 > = {
   1: { perRoom: { min: 0, max: 2 }, weights: { rat: 60, goblin: 40 } },
   2: { perRoom: { min: 0, max: 2 }, weights: { rat: 25, goblin: 50, skeleton: 25 } },
-  3: { perRoom: { min: 0, max: 3 }, weights: { goblin: 35, skeleton: 45, orc: 20 } },
+  3: { perRoom: { min: 0, max: 2 }, weights: { goblin: 35, skeleton: 45, orc: 20 } },
   4: { perRoom: { min: 1, max: 3 }, weights: { skeleton: 50, orc: 50 } },
   5: { perRoom: { min: 1, max: 3 }, weights: { skeleton: 35, orc: 65 } },
 };

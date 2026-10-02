@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../rng';
-import { damageRange, rollDamage } from './damage';
+import { damageRange, mitigate, rollDamage } from './damage';
 
 describe('dano', () => {
   it('faixa do Knight (ATK 10) é 8–13', () => {
@@ -16,13 +16,24 @@ describe('dano', () => {
     for (let i = 0; i < 500; i++) expect(rollDamage(3, 50, rng)).toBe(1);
   });
 
-  it('Knight (ATK 10) contra Goblin dummy (DEF 1) → 7 a 12', () => {
+  it('Knight (ATK 10) contra Goblin (DEF 1) → 8–13 × 20/21 → 8 a 12', () => {
     const rng = Rng.fromSeed(2);
     for (let i = 0; i < 1000; i++) {
       const d = rollDamage(10, 1, rng);
-      expect(d).toBeGreaterThanOrEqual(7);
+      expect(d).toBeGreaterThanOrEqual(8);
       expect(d).toBeLessThanOrEqual(12);
     }
+  });
+
+  it('DEF reduz em porcentagem (K = 20): DEF 0 não reduz, DEF 20 corta metade', () => {
+    expect(mitigate(30, 0)).toBe(30);
+    expect(mitigate(30, 20)).toBe(15);
+    expect(mitigate(14, 15)).toBe(8); // Skeleton no topo da faixa contra DEF 15: era 1 na fórmula antiga
+  });
+
+  it('DEF alta segura muito, mas golpe forte ainda passa', () => {
+    expect(mitigate(30, 100)).toBe(5);
+    expect(mitigate(2, 100)).toBe(1);
   });
 
   it('é determinístico com o mesmo seed', () => {

@@ -52,7 +52,7 @@ export const ENTITY_TEMPLATES = {
     name: 'Orc',
     glyph: 'O',
     maxHp: 56,
-    atk: 16,
+    atk: 14,
     def: 3,
     ai: 'skirmisher',
     ranged: { range: 4, multiplier: 0.7, cooldown: 4, projectile: 'uma lança' },
