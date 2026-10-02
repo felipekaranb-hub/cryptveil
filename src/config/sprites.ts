@@ -4,6 +4,7 @@
  * Tiles de 16 px desenhados a 2× no tile de 32. Visual da view, não regra.
  */
 import type { ItemId } from '../core/data/items';
+import type { RelicId } from '../core/data/relics';
 import { TILE_SIZE } from './display';
 
 export const ATLAS = {
@@ -21,8 +22,9 @@ const OWN = 264;
 /** Entidade → frame (pelo nome do template; monstro novo sem sprite cai no FALLBACK). */
 export const ENTITY_FRAMES: Readonly<Record<string, number>> = {
   Knight: 97,
-  Rat: 124,
-  Goblin: 112,
+  // Desenhados no estilo do pack (o Rat 124 era visto de cima e não lia; o Goblin 112 ganhou pele verde)
+  Rat: OWN + 3,
+  Goblin: OWN + 4,
   Skeleton: OWN + 0,
   Orc: OWN + 1,
   'Orc Warlord': OWN + 2,
@@ -44,16 +46,34 @@ export const TILE_FRAMES = {
   merchant: 90,
 } as const;
 
-/** Ícone do item (inventário, paper doll, hotbar). Sem ícone → sigla, como antes. */
+/** Ícone do item (inventário, loja, paper doll). Todo item do MVP tem; item novo sem ícone → sigla. */
 export const ITEM_FRAMES: Readonly<Partial<Record<ItemId, number>>> = {
   sword: 104,
   spikeSword: 105,
-  magicSword: 106,
+  magicSword: OWN + 13,
+  leatherArmor: OWN + 5,
+  chainArmor: OWN + 6,
+  plateArmor: OWN + 7,
+  ironHelmet: OWN + 8,
+  knightHelmet: OWN + 9,
+  crownHelmet: OWN + 10,
   woodShield: 101,
-  towerShield: 102,
-  demonShield: 102,
+  towerShield: OWN + 11,
+  demonShield: OWN + 12,
   hpPotion: 115,
   manaPotion: 116,
+  cheese: OWN + 14,
+  goblinEar: OWN + 15,
+  bone: OWN + 16,
+  orcTooth: OWN + 17,
+};
+
+/** Ícone de cada relíquia. */
+export const RELIC_FRAMES: Readonly<Record<RelicId, number>> = {
+  goldenIdol: OWN + 18,
+  watcherEye: OWN + 19,
+  bloodStone: OWN + 20,
+  warTotem: OWN + 21,
 };
 
 /**

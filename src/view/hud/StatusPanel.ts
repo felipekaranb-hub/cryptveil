@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, FONT_SCALE, TEXT_COLORS } from '../../config/display';
-import { ATLAS, ITEM_FRAMES } from '../../config/sprites';
+import { ATLAS, ITEM_FRAMES, RELIC_FRAMES } from '../../config/sprites';
 import type { EquipSlot } from '../../core/items/Item';
 import type { HudSnapshot } from './model';
 import { LEFT_X, PANEL_H, PANEL_TOP, PANEL_W, textStyle } from './ui';
@@ -135,7 +135,10 @@ export class StatusPanel {
     s.relics.forEach((r, i) => {
       const view = this.relics[i];
       if (!view) return;
-      view.label.setText(r ? initials(r) : '—').setColor(r ? TEXT_COLORS.PRIMARY : TEXT_COLORS.MUTED);
+      const id = s.relicIds[i];
+      view.icon.setVisible(id !== null && id !== undefined);
+      if (id) view.icon.setFrame(RELIC_FRAMES[id]);
+      view.label.setText(r ? (id ? '' : initials(r)) : '—').setColor(r ? TEXT_COLORS.PRIMARY : TEXT_COLORS.MUTED);
       view.box.setStrokeStyle(1, r ? COLORS.GOLD : COLORS.FRAME);
     });
   }

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ATLAS } from '../../config/sprites';
 import { COLORS, MAP_VIEW, TEXT_COLORS } from '../../config/display';
 import type { InputSource } from '../../input/InputController';
 import { getRenderScale } from '../scaling';
@@ -64,9 +65,16 @@ export class InventoryScreen {
             ? '#b08a80'
             : TEXT_COLORS.PRIMARY;
       const arrow = row.tone === 'better' ? ' ↑' : row.tone === 'worse' ? ' ↓' : '';
-      items.push(
-        s.add.text(left + 16, y, `${selected ? '▶ ' : row.header ? '' : '  '}${row.text}${arrow}`, textStyle(row.header ? 10 : 11, color)),
-      );
+      if (row.icon !== undefined) {
+        // Ícone do item entre a seta e o nome (Marco 6b)
+        items.push(s.add.text(left + 16, y, selected ? '▶' : '', textStyle(11, color)));
+        items.push(s.add.image(left + 38, y + ROW_H / 2 - 2, ATLAS.key, row.icon));
+        items.push(s.add.text(left + 50, y, `${row.text}${arrow}`, textStyle(11, color)));
+      } else {
+        items.push(
+          s.add.text(left + 16, y, `${selected ? '▶ ' : row.header ? '' : '  '}${row.text}${arrow}`, textStyle(row.header ? 10 : 11, color)),
+        );
+      }
       if (row.detail) {
         items.push(s.add.text(left + MAP_VIEW.width - 16, y, row.detail, textStyle(11, TEXT_COLORS.MUTED)).setOrigin(1, 0));
       }

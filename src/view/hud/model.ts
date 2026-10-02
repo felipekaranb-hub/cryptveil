@@ -2,7 +2,8 @@ import type { Action, SkillSlot } from '../../core/actions';
 import { CARDS, type CardId } from '../../core/data/cards';
 import { getItem, type ItemId } from '../../core/data/items';
 import { KNIGHT_HOTBAR, resolveSkill, SKILLS, STARTING_SKILL, skillSummary, type SkillId } from '../../core/data/skills';
-import { RELICS } from '../../core/data/relics';
+import { RELICS, type RelicId } from '../../core/data/relics';
+import { ITEM_FRAMES, RELIC_FRAMES } from '../../config/sprites';
 import { getTile, TileType } from '../../core/dungeon/DungeonMap';
 import { sellPrice, shopOffers } from '../../core/shop';
 import { countInBag, RELIC_SLOTS, xpToNextLevel, type HeroState } from '../../core/hero';
@@ -62,6 +63,8 @@ export interface HudSnapshot {
   readonly floor: number;
   readonly gear: readonly GearSlotView[];
   readonly relics: readonly (string | null)[];
+  /** Mesmos slots, com o id (a view acha o ícone). */
+  readonly relicIds: readonly (RelicId | null)[];
   readonly hotbar: readonly HotbarSlotView[];
   /** Cartas escolhidas na run (level up). */
   readonly deckSize: number;
@@ -87,6 +90,7 @@ export function buildHud(state: RunState): HudSnapshot {
       const id = hero.equipment[slot];
       return { slot, label, item: id ? getItem(id).name : null, itemId: id ?? null };
     }),
+    relicIds: Array.from({ length: RELIC_SLOTS }, (_, i) => hero.relics[i] ?? null),
     relics: Array.from({ length: RELIC_SLOTS }, (_, i) => {
       const id = hero.relics[i];
       return id ? RELICS[id].name : null;
@@ -190,6 +194,8 @@ export interface InventoryRow {
   readonly action: Action | null;
   /** Título de seção: não dá pra selecionar. */
   readonly header?: boolean;
+  /** Frame do ícone no atlas (Marco 6b). */
+  readonly icon?: number;
   /** Destaque: melhor que o equipado (↑) ou pior (↓). */
   readonly tone?: 'better' | 'worse';
   /** Loja: pilha de mais de 1 unidade — o Enter pergunta se vende todas. */
@@ -212,6 +218,13 @@ export function buildInventoryRows(state: RunState, tab: number): InventoryRow[]
   if (tab === 1) return sellRows(state.hero);
   return deckRows(state.hero);
 }
+
+/** Ícone do item/relíquia, se o atlas tem (espalhado na linha: `...itemIcon(id)`). */
+const itemIcon = (id: ItemId): { icon?: number } => {
+  const icon = ITEM_FRAMES[id];
+  return icon === undefined ? {} : { icon };
+};
+const relicIcon = (id: RelicId): { icon: number } => ({ icon: RELIC_FRAMES[id] });
 
 const header = (text: string): InventoryRow => ({ text, detail: '', info: '', verb: null, action: null, header: true });
 
@@ -238,6 +251,7 @@ function bagRows(hero: HeroState): InventoryRow[] {
     if (item.kind !== 'equipment') continue;
     rows.push({
       text: `${label}: ${item.name}`,
+      ...itemIcon(id),
       detail: itemStats(item),
       info: 'Guarda na mochila (gasta o turno)',
       verb: 'tirar',
@@ -258,6 +272,7 @@ function bagRows(hero: HeroState): InventoryRow[] {
       const what = item.effect.type === 'heal' ? 'HP' : 'mana';
       rows.push({
         text: `${item.name}${qty}`,
+        ...itemIcon(id),
         detail: `+${Math.round(item.effect.pct * 100)}% ${what}`,
         info: 'Usar gasta o turno',
         verb: 'usar',
@@ -273,6 +288,7 @@ function bagRows(hero: HeroState): InventoryRow[] {
     const slotLabel = GEAR_SLOTS.find((g) => g.slot === item.slot)?.label ?? item.slot;
     rows.push({
       text: `${item.name}${qty}`,
+      ...itemIcon(id),
       detail: itemStats(item),
       info: `${slotLabel}: troca ${current ? current.name : 'slot vazio'} (gasta o turno)`,
       verb: 'equipar',
@@ -294,6 +310,7 @@ function sellRows(hero: HeroState): InventoryRow[] {
       const item = getItem(id);
       return {
         text: `${item.name}${count > 1 ? ` ×${count}` : ''}`,
+        ...itemIcon(id),
         detail: `vende por ${sellPrice(item, hero.vocation)}g`,
         info: item.kind === 'material' ? 'Produto de criatura: venda no mercador' : 'O Knight não usa: venda no mercador',
         verb: null,
@@ -318,7 +335,7 @@ function deckRows(hero: HeroState): InventoryRow[] {
   rows.push(header('RELÍQUIAS'));
   if (hero.relics.length === 0) rows.push(header('  (nenhuma: o mercador vende)'));
   for (const id of hero.relics) {
-    rows.push({ text: RELICS[id].name, detail: '', info: RELICS[id].description, verb: null, action: null });
+    rows.push({ text: RELICS[id].name, ...relicIcon(id), detail: '', info: RELICS[id].description, verb: null, action: null });
   }
   rows.push(header('CARTAS'));
   const cards = Object.entries(hero.cards) as [CardId, number][];
@@ -351,6 +368,7 @@ export function buildShopRows(state: RunState, tab: number): InventoryRow[] {
         const relic = RELICS[offer.relicId];
         return {
           text: `Relíquia: ${relic.name}`,
+          ...relicIcon(offer.relicId),
           detail: `${offer.price}g`,
           info: relic.description,
           verb: affordable ? 'comprar' : null,
@@ -362,6 +380,7 @@ export function buildShopRows(state: RunState, tab: number): InventoryRow[] {
       const stats = item.kind === 'equipment' ? `  ${itemStats(item)}` : '';
       return {
         text: `${item.name}${offer.stockIndex === null ? '' : ' (1 un.)'}`,
+        ...itemIcon(offer.itemId),
         detail: `${offer.price}g`,
         info:
           item.kind === 'potion'
@@ -379,6 +398,7 @@ export function buildShopRows(state: RunState, tab: number): InventoryRow[] {
     const what = item.kind === 'equipment' ? itemStats(item) : item.kind === 'material' ? 'Produto de criatura' : 'Poção';
     return {
       text: `${item.name}${count > 1 ? ` ×${count}` : ''}`,
+      ...itemIcon(id),
       detail: count > 1 ? `+${unitPrice}g cada` : `+${unitPrice}g`,
       info: count > 1 ? `${what} · todos: +${unitPrice * count}g` : what,
       verb: 'vender',
