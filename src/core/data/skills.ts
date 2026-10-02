@@ -2,7 +2,8 @@ import type { SkillSlot } from '../actions';
 import type { ItemId } from './items';
 
 /**
- * Skills do Knight. Sem cooldown: o limite é a mana. Todas usam o ATK (§2.6).
+ * Skills do Knight. Limite: mana e, desde o Marco 6b, recarga (SKILL_COOLDOWNS
+ * em balance.ts). Todas usam o ATK (§2.6).
  *
  * Marco 2d: o Knight começa só com o Brutal Strike. As outras saem como
  * CARTA no level up; tirar de novo a carta de uma skill que já tem sobe o

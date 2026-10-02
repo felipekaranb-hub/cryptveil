@@ -52,6 +52,8 @@ export interface HeroState {
   bonusOfferCards: number;
   /** Meta (Tome "Releitura"): rerrolagens da escolha de carta que sobram na run. */
   rerolls: number;
+  /** Turnos até cada skill poder ser usada de novo (ausente/0 = pronta). */
+  cooldowns: Partial<Record<SkillId, number>>;
 }
 
 /** Slots de relíquia (§2.8). */
@@ -95,6 +97,7 @@ export function createKnightHero(bonuses: RunBonuses = NO_BONUSES): HeroState {
     xpBonusPct: bonuses.xpPct,
     bonusOfferCards: bonuses.bonusOfferCards,
     rerolls: bonuses.rerolls,
+    cooldowns: {},
   };
 }
 
@@ -163,7 +166,6 @@ export function gainXp(hero: HeroState, player: Entity, xp: number, events: Core
     player.maxHp += LEVEL_UP_GAIN.maxHp;
     player.hp += LEVEL_UP_GAIN.maxHp;
     hero.maxMana += LEVEL_UP_GAIN.maxMana;
-    hero.mana += LEVEL_UP_GAIN.maxMana;
     hero.pendingCardPicks += 1;
     events.push({ type: 'leveled-up', level: hero.level });
   }

@@ -14,7 +14,7 @@ import { Rng } from '../rng';
 import { enterNextFloor, entityAt, getPlayer, livingEnemies, type RunState } from '../run';
 import { attack } from './combat';
 import { applyTrainingChoice, updateRoomProgress } from './rooms';
-import { useHotbarSlot, usePotion, type HotbarFailure } from './skills';
+import { tickCooldowns, useHotbarSlot, usePotion, type HotbarFailure } from './skills';
 
 /** Por que a ação não gastou turno. */
 export type TurnFailure =
@@ -171,6 +171,7 @@ export function resolvePlayerAction(
   // Level up neste turno: abre a escolha de carta (depois da Training Room, se as duas)
   openCardPromptIfPending(state, rng, events);
   revealAround(state);
+  tickCooldowns(state);
   state.turn += 1;
   state.rngState = rng.getState();
   return { tookTurn: true, events };

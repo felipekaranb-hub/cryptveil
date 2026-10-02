@@ -27,6 +27,8 @@ export function serializeRun(state: RunState): string {
  * próximos andares nascem com os monstros reais.
  * v6 (Marco 4) → v7: herói sem bônus de meta (a run começou antes do Sanctum)
  * e kills contando a partir de agora.
+ * v7 → v8: recargas zeradas (todas as skills prontas). O Orc Warlord já vivo
+ * no andar mantém os stats antigos; os próximos nascem com os novos.
  */
 type Migration = (old: Record<string, unknown>) => Record<string, unknown> | null;
 
@@ -61,6 +63,7 @@ const MIGRATIONS: Readonly<Record<number, Migration>> = {
     runStats: { kills: {} },
     hero: { ...(isRecord(old['hero']) ? old['hero'] : {}), xpBonusPct: 0, bonusOfferCards: 0, rerolls: 0 },
   }),
+  7: (old) => ({ ...old, version: 8, hero: { ...(isRecord(old['hero']) ? old['hero'] : {}), cooldowns: {} } }),
 };
 
 /**
@@ -113,6 +116,7 @@ function looksLikeRun(v: Record<string, unknown>): v is Record<string, unknown> 
   for (const key of ['xpBonusPct', 'bonusOfferCards', 'rerolls'] as const) {
     if (typeof hero[key] !== 'number') return false;
   }
+  if (!isRecord(hero['cooldowns'])) return false;
   const stats = v['runStats'];
   if (!isRecord(stats) || !isRecord(stats['kills'])) return false;
   for (const key of ['seed', 'turn', 'floor'] as const) {

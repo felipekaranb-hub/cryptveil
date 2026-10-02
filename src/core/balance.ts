@@ -82,7 +82,20 @@ export const KNIGHT_START_MANA = 30;
  * isso. Não existe regen por turno — com ele, ficar parado virava mana de
  * graça e a Wound Cleansing virava HP infinito. HP também não regenera.
  */
-export const MANA_PER_KILL = 4;
+export const MANA_PER_KILL = 3;
+
+/**
+ * Recarga das skills, em turnos do player (Marco 6b, feedback do Felipe:
+ * chegava no boss com mana pra spammar Berserk). Usou no turno t, volta no
+ * turno t + N. Brutal Strike é o golpe base: sem recarga. Muda a decisão do
+ * Marco 2 ("sem cooldown, só mana"). Números provisórios.
+ */
+export const SKILL_COOLDOWNS = {
+  brutalStrike: 0,
+  berserk: 3,
+  whirlwindThrow: 2,
+  woundCleansing: 5,
+} as const;
 
 /**
  * XP pro próximo nível = XP_BASE + XP_STEP × (nível − 1).
@@ -91,7 +104,11 @@ export const MANA_PER_KILL = 4;
  */
 export const XP_CURVE = { base: 8, step: 3 } as const;
 
-/** Level up: +10 HP max, +10 Mana max e uma escolha de carta (Marco 2d). */
+/**
+ * Level up: +10 HP max, +10 Mana max e uma escolha de carta (Marco 2d).
+ * Desde o ajuste do Marco 6b o level up NÃO enche a mana (só aumenta o
+ * máximo): mana vem de lutar e de poção. O HP continua subindo junto.
+ */
 export const LEVEL_UP_GAIN = { maxHp: 10, maxMana: 10 } as const;
 
 /** Cartas oferecidas por level up, e o peso de cada raridade no sorteio. */

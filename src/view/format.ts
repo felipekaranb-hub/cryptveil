@@ -124,6 +124,8 @@ export function formatFailure(result: TurnResult): string | null {
       return 'Skill ainda não liberada (vem em carta de level up)';
     case 'no-mana':
       return 'Mana insuficiente';
+    case 'on-cooldown':
+      return 'Skill recarregando';
     case 'no-target':
       return 'Nenhum alvo ao alcance';
     case 'full-hp':

@@ -24,8 +24,9 @@ import type { CardId } from './data/cards';
  * 5: fog of war, tiles explorados do andar (Marco 3).
  * 6: relíquias, mercador, escada escondida do boss, habilidades de monstro (Marco 4).
  * 7: bônus da meta no herói e estatísticas da run (kills por monstro) (Marco 5).
+ * 8: recarga das skills no herói (ajuste pós-6b).
  */
-export const RUN_STATE_VERSION = 7;
+export const RUN_STATE_VERSION = 8;
 
 /** Números da run pro resumo do fim e pro bestiário (Marco 5). */
 export interface RunStats {

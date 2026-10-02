@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CARD_OFFER_SIZE } from './balance';
+import { CARD_OFFER_SIZE, MANA_PER_KILL } from './balance';
 import { applyCard, isCardAvailable, rollCardOffer } from './cards';
 import { CARDS, type CardId } from './data/cards';
 import { ENTITY_TEMPLATES } from './data/entities';
@@ -144,7 +144,7 @@ describe('aplicar carta', () => {
     state.hero.mana = 0;
     const r = resolvePlayerAction(state, { type: 'move', dir: 'E' });
     expect(r.events.find((e) => e.type === 'rewarded')).toMatchObject({ xp: 6 }); // 4 + 2
-    expect(state.hero.mana).toBe(7); // 4 + 3
+    expect(state.hero.mana).toBe(MANA_PER_KILL + 3); // kill + Sede de Sangue
   });
 });
 

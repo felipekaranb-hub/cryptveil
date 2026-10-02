@@ -128,3 +128,14 @@ describe('migração v6 → v7', () => {
     expect(deserializeRun(JSON.stringify(broken))).toBeNull();
   });
 });
+
+describe('migração v7 → v8', () => {
+  it('ganha recargas vazias e continua jogável', () => {
+    const state = createRun(41);
+    const { cooldowns: _c, ...hero } = state.hero;
+    const migrated = deserializeRun(JSON.stringify({ ...state, hero, version: 7 }));
+    expect(migrated!.version).toBe(RUN_STATE_VERSION);
+    expect(migrated!.hero).toEqual(state.hero);
+    expect(resolvePlayerAction(migrated!, { type: 'wait' }).tookTurn).toBe(true);
+  });
+});

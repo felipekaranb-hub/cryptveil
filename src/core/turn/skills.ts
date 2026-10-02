@@ -1,5 +1,6 @@
 import type { SkillSlot } from '../actions';
 import { getItem, type ItemId } from '../data/items';
+import { SKILL_COOLDOWNS } from '../balance';
 import { KNIGHT_HOTBAR, resolveSkill, type SkillId } from '../data/skills';
 import { isWalkable } from '../dungeon/DungeonMap';
 import type { Entity } from '../entities/Entity';
@@ -16,6 +17,7 @@ export type HotbarFailure =
   | 'not-a-turn-action'
   | 'skill-locked'
   | 'no-mana'
+  | 'on-cooldown'
   | 'no-target'
   | 'full-hp'
   | 'full-mana'
@@ -43,6 +45,7 @@ export function castSkill(state: RunState, id: SkillId, rng: Rng, events: CoreEv
   if (!level) return 'skill-locked';
   const skill = resolveSkill(id, level);
   const player = getPlayer(state);
+  if ((hero.cooldowns[id] ?? 0) > 0) return 'on-cooldown';
   if (hero.mana < skill.manaCost) return 'no-mana';
 
   let targets: Entity[] = [];
@@ -69,6 +72,8 @@ export function castSkill(state: RunState, id: SkillId, rng: Rng, events: CoreEv
   }
 
   hero.mana -= skill.manaCost;
+  // Recarga: o fim deste turno já desconta 1 (ver tickCooldowns)
+  if (SKILL_COOLDOWNS[id] > 0) hero.cooldowns[id] = SKILL_COOLDOWNS[id];
   events.push({ type: 'skill-used', entityId: player.id, skillId: id });
   if (skill.kind === 'heal') {
     const amount = healEntity(player, Math.round(player.maxHp * skill.healPct));
@@ -134,4 +139,14 @@ function enemiesInLine(state: RunState, from: Entity, facing: Direction, range: 
     if (hits.length > 0) return hits;
   }
   return [];
+}
+
+/** Fim de um turno do player: cada recarga anda 1. */
+export function tickCooldowns(state: RunState): void {
+  const { cooldowns } = state.hero;
+  for (const id of Object.keys(cooldowns) as SkillId[]) {
+    const left = (cooldowns[id] ?? 0) - 1;
+    if (left > 0) cooldowns[id] = left;
+    else delete cooldowns[id];
+  }
 }

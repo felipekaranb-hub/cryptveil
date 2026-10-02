@@ -44,7 +44,7 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | # | Tema | Decisão |
 |---|---|---|
 | 2.1 | Sorcerer | Staff alcance 3; ataque básico é mágico e ignora shield/defesa pesada. Pós-MVP. |
-| 2.2 | Boss do Floor 5 | **Orc Warlord** (HP ~500, dano 18–30 → ATK 24, convoca 1 Orc a cada 3 turnos, enraged <30% HP = +50% dano). Drops: Crown Helmet OU Magic Sword; sempre Tower Shield; ~50g. Dragon Lord fica pro v1.1. Implementado no Marco 4 (detalhes na §5). |
+| 2.2 | Boss do Floor 5 | **Orc Warlord** (HP ~500 — **750 desde o ajuste pós-6b**, invocando a cada **2** turnos; dano 18–30 → ATK 24, convoca 1 Orc a cada 3 turnos, enraged <30% HP = +50% dano). Drops: Crown Helmet OU Magic Sword; sempre Tower Shield; ~50g. Dragon Lord fica pro v1.1. Implementado no Marco 4 (detalhes na §5). |
 | 2.3 | Monstros do MVP | **Rat, Skeleton, Goblin, Orc.** Dragon volta no v1.1. |
 | 2.4 | Equipamento do Knight | Começa com Sword. Tabela abaixo. |
 | 2.5 | Itens | `equipTags: Vocation[]`. Drop universal, equip restrito (`canEquip` aceita a vocação ou `'ALL'`). Fora da vocação → aba "Pra vender". |
@@ -325,6 +325,14 @@ Ajustes (todos medidos na simulação, 200 seeds; ruído de ±3 pontos entre rod
 
 - **Efeito colateral:** como o bot morre mais cedo, a renda de gold caiu (~78g por run sem meta). O Sanctum (2.490g) fica ainda mais longo de completar; o Felipe decidiu manter os preços por ora (3C).
 
+#### ✅ Ajuste pós-6b — Dificuldade (02/10/2026, em teste pelo Felipe)
+Feedback do Felipe jogando: "ainda fácil; cheguei no boss com mana pra spammar Berserk e matar todos". Causa: o level up enchia +10 de mana, cada kill rendia +4 (~120 de mana no andar 5) e o Berserk acerta o boss e os Orcs invocados juntos. Das opções (A mana mais apertada, B boss resiste a área, C recarga nas skills, D boss mais forte) o Felipe escolheu **A + C + D pra testar**:
+- **A)** O level up **só aumenta a mana máxima** (não enche mais) e a **mana por kill caiu de 4 pra 3**.
+- **C)** **Recarga nas skills** (`SKILL_COOLDOWNS` em `balance.ts`, em turnos do player: usou no turno t, volta no t + N): Brutal Strike 0 (golpe base), **Berserk 3**, Whirlwind Throw 2, Wound Cleansing 5. Muda a decisão do Marco 2 ("sem cooldown, só mana"). A hotbar mostra "espera N" em vermelho; tentar usar recarregando não gasta mana nem turno. `RunState` v8 (`hero.cooldowns`) com migração do v7.
+- **D)** **Orc Warlord: HP 500 → 750** e **invocação a cada 2 turnos** (era 3; ainda no máximo 3 vivos).
+- **Simulação (bot, 200 seeds; sem meta / Sanctum no máximo):** antes **14% / 42%**; depois **0% / 22%** (sem meta, 14% chegam ao boss e nenhum o mata). Cada mudança sozinha (150 seeds): só C 15% / 43% (o bot não spamma Berserk, então a recarga não pesa pra ele: ela mira o jeito que o Felipe joga); **só A 1% / 33%** (o bot depende de mana pra cura e Brutal Strike); só D 8% / 34%.
+- **Atenção:** pela régua do bot, o jogo ficou duríssimo. Se o Felipe achar demais, o primeiro botão a girar é a mana (A): devolver os +4 por kill ou o enchimento parcial no level up.
+
 #### ✅ Marco 6b — Polish (entregue em 02/10/2026)
 Só view: o core, o save e a simulação não mudaram. 277 testes.
 - **Sprites:** o Felipe queria os do **Tibia**. Não dá: são da CipSoft, e o repositório e o site são públicos (qualquer sprite que entra lá fica acessível, divulgando ou não). Fica em aberto o **pacote de sprites local** (pasta fora do repositório no PC do fliperama), se ele quiser usar sprites próprios só em casa (§7). Opções vistas e recusadas: Dungeon Crawl (CC0, 32 px), Stendhal (CC-BY-SA, 48×64, estilo MMO), Shattered Pixel Dungeon (GPL, 16 px). Escolhido o estilo **Kenney Tiny Dungeon** (CC0, 16 px a 2×), porque é simples o bastante pra **estender** com sprites próprios quando vierem classes, armas e monstros novos.
@@ -361,7 +369,7 @@ Só view: o core, o save e a simulação não mudaram. 277 testes.
 
 - **Lacunas de design (GDD perdido) — decidir no marco indicado:**
   - [x] Marco 2 (decidido em 01/10/2026, números provisórios; balancear depois):
-    - **Skills do Knight**, sem cooldown, só mana (multiplicadores do Marco 2c): **Brutal Strike** (1 alvo adjacente, ATK×2, 5 mana) · **Berserk** (4 adjacentes, ATK×1,25, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,5, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana). Esses são o nível 1; desde o Marco 2d só o Brutal Strike vem de início e as outras saem em carta (ver §5).
+    - **Skills do Knight**, sem cooldown, só mana (**desde o ajuste pós-6b têm recarga**, ver §5) (multiplicadores do Marco 2c): **Brutal Strike** (1 alvo adjacente, ATK×2, 5 mana) · **Berserk** (4 adjacentes, ATK×1,25, 10 mana) · **Whirlwind Throw** (1 alvo em linha reta até 3 tiles, ATK×1,5, 8 mana) · **Wound Cleansing** (cura 25% do HP max, 10 mana). Esses são o nível 1; desde o Marco 2d só o Brutal Strike vem de início e as outras saem em carta (ver §5).
     - **Mana:** 30 max no início. ~~Regenera 1 a cada 2 turnos~~ → desde o Marco 2c, +4 por kill (sem regen por turno). HP não regenera sozinho (só passiva +2 por kill e cura).
     - **XP:** ~~`20 × nível atual`~~ → desde o Marco 2d, `8 + 3 × (nível − 1)`. XP de cada monstro no template.
     - **Gold por kill:** faixa `goldMin`–`goldMax` no template, sorteada pelo `Rng`; todo kill rende ≥ 1.

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '../actions';
-import { KILL_HEAL, KNIGHT_START_MANA, MANA_PER_KILL, ROOMS_PER_TRAINING, TRAINING_BONUS } from '../balance';
+import { KILL_HEAL, KNIGHT_START_MANA, LEVEL_UP_GAIN, MANA_PER_KILL, ROOMS_PER_TRAINING, TRAINING_BONUS } from '../balance';
 import { damageRange, mitigate } from '../combat/damage';
 import { ENTITY_TEMPLATES } from '../data/entities';
 import { getTile, setTile, TileType } from '../dungeon/DungeonMap';
 import { createEntity, type Entity } from '../entities/Entity';
 import type { CoreEvent } from '../events';
-import { refreshPlayerStats, xpToNextLevel } from '../hero';
+import { gainXp, refreshPlayerStats, xpToNextLevel } from '../hero';
 import { Rng } from '../rng';
 import { createTestRun, enterNextFloor, getPlayer, type RunState } from '../run';
 import { resolvePlayerAction } from './TurnManager';
@@ -320,5 +320,38 @@ describe('salas exploradas e Training Room', () => {
     state.hero.trainedAtk = 2;
     refreshPlayerStats(state.hero, getPlayer(state));
     expect(getPlayer(state).atk).toBe(13);
+  });
+});
+
+describe('recarga das skills (ajuste pós-6b)', () => {
+  it('Berserk volta depois de 3 turnos; recarregando não gasta mana nem turno', () => {
+    const state = arena([{ x: 8, y: 5 }]);
+    state.hero.skills.berserk = 1;
+    state.entities[1]!.hp = 999;
+    state.entities[1]!.maxHp = 999;
+    state.hero.mana = 100;
+    expect(resolvePlayerAction(state, skill(2)).tookTurn).toBe(true);
+    const mana = state.hero.mana;
+    expect(resolvePlayerAction(state, skill(2))).toMatchObject({ tookTurn: false, reason: 'on-cooldown' });
+    expect(state.hero.mana).toBe(mana);
+    resolvePlayerAction(state, WAIT);
+    resolvePlayerAction(state, WAIT);
+    expect(resolvePlayerAction(state, skill(2)).tookTurn).toBe(true);
+  });
+
+  it('Brutal Strike não tem recarga', () => {
+    const state = arena([{ x: 8, y: 5 }]);
+    state.entities[1]!.hp = 999;
+    state.entities[1]!.maxHp = 999;
+    expect(resolvePlayerAction(state, skill(1)).tookTurn).toBe(true);
+    expect(resolvePlayerAction(state, skill(1)).tookTurn).toBe(true);
+  });
+
+  it('level up aumenta a mana máxima sem encher a barra', () => {
+    const state = arena([]);
+    state.hero.mana = 5;
+    gainXp(state.hero, getPlayer(state), xpToNextLevel(1), []);
+    expect(state.hero.maxMana).toBe(KNIGHT_START_MANA + LEVEL_UP_GAIN.maxMana);
+    expect(state.hero.mana).toBe(5);
   });
 });

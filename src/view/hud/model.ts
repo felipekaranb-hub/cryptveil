@@ -113,11 +113,13 @@ function buildHotbar(state: RunState): HotbarSlotView[] {
       if (!level) return { slot, name: SKILLS[entry.id].name, detail: '—', state: 'locked' };
       const skill = resolveSkill(entry.id, level);
       const lv = level > 1 ? ` ${roman(level)}` : '';
+      const cooldown = hero.cooldowns[entry.id] ?? 0;
       return {
         slot,
         name: `${SKILLS[entry.id].name}${lv}`,
-        detail: `${skill.manaCost} mana`,
-        state: hero.mana >= skill.manaCost ? 'ready' : 'unusable',
+        // Recarregando mostra os turnos que faltam no lugar do custo
+        detail: cooldown > 0 ? `espera ${cooldown}` : `${skill.manaCost} mana`,
+        state: cooldown === 0 && hero.mana >= skill.manaCost ? 'ready' : 'unusable',
       };
     }
     const count = countInBag(hero, entry.id);
