@@ -5,9 +5,16 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 
 ## Onde estamos (atualizado em 02/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário) 6a (balanceamento: DEF em porcentagem, bot sem meta ~14%) e 6b (sprites Kenney Tiny Dungeon + próprios, movimento animado, fonte VT323, sons sintetizados, mudo). Tudo publicado na `main`. **O MVP está completo.**
-- **Próximo:** MVP validado pelo Felipe (dificuldade aprovada em 02/10/2026). Escolher o primeiro bloco do pós-MVP (§5 do handoff: classes, andares 6–15, monstros novos, música). Apresentar o plano antes.
-- O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
+- **MVP completo e validado pelo Felipe** ("dificuldade satisfatória, o jogo está divertido"). Tudo publicado na `main` e no GitHub Pages.
+- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa), 4 (monstros reais, mercador e loja, Orc Warlord, 4 relíquias), 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress, bestiário), 6a (DEF em porcentagem, ATK do Knight 8), 6b (sprites Kenney Tiny Dungeon + próprios, movimento animado, fonte VT323, sons sintetizados, mudo M/Select) e o **ajuste pós-6b de dificuldade** (level up não enche a mana, 3 de mana por kill, recarga nas skills — Berserk 3, Whirlwind 2, Wound Cleansing 5 —, Orc Warlord com 750 de HP invocando a cada 2 turnos; `RunState` v8). Detalhes e números da simulação no `docs/HANDOFF.md` §5.
+- **Próximo: escolher o primeiro bloco do pós-MVP.** Opções apresentadas ao Felipe em 02/10/2026 (ele ainda não escolheu):
+  - **A) Região 2 — andares 6–10** (recomendada): 3–4 monstros novos (Dragon, Lich, Vampire, Ghost), boss no andar 10, itens tier 2, estoque novo no mercador. Reaproveita região/boss/mercador; balancear antes das classes evita rebalancear tudo por classe.
+  - **B) Sorcerer** (§2.1: staff alcance 3, ataque mágico ignora DEF): skills, cartas e Shrine of Vocations no Sanctum. Mais variedade, mais balanceamento.
+  - **C) Modo fliperama**: tela de atração + ranking de 3 iniciais. Melhor quando o bartop existir (o Felipe ainda não comprou).
+  - **D) Música**: o Felipe vai arrumar uma; encaixar com volume próprio e o mesmo mudo. Pequeno, combina com qualquer outro.
+  - Escolhido o bloco: **apresentar o plano** (arquivos, números, lacunas em 2–3 opções + recomendação) e esperar o OK antes de codar.
+- **Pendências conhecidas** (handoff §7): sprites que faltam (ícones das skills na hotbar, monstros novos — desenhar no estilo do Tiny Dungeon, ver "Sprites" abaixo); custo do Sanctum (2.490g) talvez longo demais; pacote de sprites local opcional só pro fliperama.
+- **Rede do ambiente:** está em "Completo" (o Felipe liberou pro `kenney.nl`). Recomendação registrada: voltar pra "Personalizado" só com os domínios necessários. Antes de pedir um domínio novo, explicar o que é e por quê.
 
 ## Vocabulário (não confundir)
 
