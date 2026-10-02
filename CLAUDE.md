@@ -3,10 +3,10 @@
 Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vitest 5.
 **Leia `docs/HANDOFF.md` inteiro antes de mexer no código** — decisões de design, arquitetura e marcos estão lá. O GDD original se perdeu: o handoff é a fonte única. Lacuna de design → perguntar ao Felipe (2–3 opções + recomendação) e registrar a decisão no handoff.
 
-## Onde estamos (atualizado em 01/10/2026)
+## Onde estamos (atualizado em 02/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) e 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário). Tudo publicado na `main`.
-- **Próximo:** Marco 6 — polish e balanceamento (dificuldade e DEF da §2.12, renda de gold vs. custo do Sanctum, tween, sprites Kenney, fonte, tela inicial, áudio). Apresentar o plano antes.
+- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário) e 6a (balanceamento: DEF em porcentagem, bot sem meta ~14%). Tudo publicado na `main`.
+- **Próximo:** Marco 6b — polish (tween de movimento, screenshake, sprites Kenney, fonte pixel, visual do Sanctum, áudio). Apresentar o plano antes.
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)

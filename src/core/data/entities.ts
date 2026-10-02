@@ -10,8 +10,9 @@ import type { EntityTemplate } from '../entities/Entity';
  * simulação headless (Marco 6 fecha).
  */
 export const ENTITY_TEMPLATES = {
-  // ATK/DEF do Knight SEM equipamento: com a Sword inicial (+3) fica ATK 10
-  knight: { kind: 'player', name: 'Knight', glyph: 'K', maxHp: 50, atk: 7, def: 5 },
+  // ATK/DEF do Knight SEM equipamento: com a Sword inicial (+3) fica ATK 11
+  // (base 8 desde o Marco 6a: com a DEF em porcentagem, ATK é o que mais pesa)
+  knight: { kind: 'player', name: 'Knight', glyph: 'K', maxHp: 50, atk: 8, def: 5 },
 
   rat: {
     kind: 'enemy',
@@ -41,7 +42,7 @@ export const ENTITY_TEMPLATES = {
     name: 'Skeleton',
     glyph: 'S',
     maxHp: 44,
-    atk: 11,
+    atk: 10,
     def: 2,
     ai: 'chase',
     reward: { xp: 9, goldMin: 3, goldMax: 6 },
@@ -66,7 +67,7 @@ export const ENTITY_TEMPLATES = {
     glyph: 'W',
     maxHp: 500,
     atk: 24,
-    def: 4,
+    def: 2,
     ai: 'skirmisher',
     ranged: { range: 4, multiplier: 0.6, cooldown: 3, projectile: 'facas' },
     summon: { every: 3, max: 3 },

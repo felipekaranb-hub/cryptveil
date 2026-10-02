@@ -80,7 +80,7 @@ describe('aplicar carta', () => {
     const state = createTestRun(1);
     const p = getPlayer(state);
     applyCard(state, 'might', []);
-    expect(p.atk).toBe(12); // 10 × 1,15 = 11,5 → 12
+    expect(p.atk).toBe(13); // 11 × 1,15 = 12,65 → 13
     applyCard(state, 'guard', []);
     expect(p.def).toBe(7);
     p.hp = 10;

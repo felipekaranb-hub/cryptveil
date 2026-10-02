@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 01/10/2026 (Marco 5). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 02/10/2026 (Marco 6a). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -62,15 +62,15 @@ Herdadas do v1, sem mudança. **Não re-perguntar.**
 | Helmet | — | Iron (Skeleton 25%) → Knight (Orc 10%) | Crown (Warlord 50%) |
 | Shield | — | Wood (Goblin 18%) → Tower (Orc 8%) | Demon (Warlord 25%) |
 
-### 2.12 Fórmula de dano — **MUDOU no v2**
+### 2.12 Fórmula de dano — **MUDOU no Marco 6a** (DEF em porcentagem)
 
 ```
 rolagem = sorteio inteiro em [round(ATK × 0,75), round(ATK × 1,25)]
-dano    = max(1, rolagem − DEF)
+dano    = max(1, round(rolagem × K / (K + DEF)))      K = 20 (DEF_MITIGATION_K)
 ```
 
-Por quê: a fórmula fixa do v1 (`max(1, ATK − DEF)`) não produzia a faixa "18–30" do boss, e é o sabor do Tibia. Implementada em `src/core/combat/damage.ts`, constantes em `src/core/balance.ts`, testada.
-**Risco conhecido:** com 4 slots de defesa + Training Room, a DEF do Knight pode passar o ATK dos monstros Tier 1 lá pelo Floor 3 (todo mundo dá 1 de dano). Vigiar no Marco 4; ajustar no Marco 6 (curva de ATK dos monstros ou redução percentual).
+DEF 5 corta 20% do dano, DEF 15 ~43%, DEF 20 metade; nunca zera. Implementada em `src/core/combat/damage.ts` (`mitigate`), constantes em `src/core/balance.ts`, testada.
+Histórico: o v1 era `max(1, ATK − DEF)` (não dava a faixa "18–30" do boss); o v2 trouxe a rolagem mas manteve `rolagem − DEF`, e a DEF empilhada do Knight (4 slots + Training Room + Guarda) deixou Skeleton e Orc batendo 1 no fim da região (confirmado no Marco 4). No Marco 6a o Felipe escolheu a redução percentual (opção A; as outras eram subir o ATK dos monstros ou subtrair metade da DEF).
 
 ---
 
@@ -219,7 +219,7 @@ Decisões tomadas (além das da §7):
 - **Alvo das skills:** o Knight guarda a direção do último passo/ataque (`facing`). Brutal Strike e Whirlwind Throw preferem o inimigo nessa direção, senão o primeiro na ordem N, S, E, W. Sem alvo, sem mana ou HP cheio → não gasta mana nem turno, e o LOG avisa.
 - **Hotbar fixa:** 1 Brutal Strike · 2 Berserk · 3 Whirlwind Throw · 4 Wound Cleansing · 5 Poção HP · 6 Poção Mana. Usar poção gasta o turno. No controle as skills ainda não têm botão (Marco 3).
 - **Training Room:** uma sala do andar (nem a inicial, nem a da escada), sem monstros, com um altar no centro. Pisar abre a escolha (←/→ + Enter/A); o turno trava até escolher, a escolha não gasta turno e o altar vira chão. Ganhar mais de uma de uma vez → uma por andar.
-- Knight base ATK 7 + Sword (+3) = ATK 10 (o mesmo do Marco 1). DEF dos itens baixa de propósito (§2.12).
+- Knight base ATK 7 + Sword (+3) = ATK 10 (o mesmo do Marco 1; desde o Marco 6a, base 8 → ATK 11). DEF dos itens baixa de propósito (§2.12).
 - Goblin provisório agora +3 ATK por andar (era +2), + XP, gold e loot por andar (`placeholderFloor1..3`, usando as chances da §2.4 dos monstros que vão morar ali).
 - **Simulação headless** (bot simples: luta com o que encontra, cura abaixo de 50%, poção abaixo de 30%, 60 seeds): vence 27%, 32% morrem no andar 1, nível médio 2,6, DEF média 7,7. Base pro balanceamento do Marco 6.
 
@@ -297,8 +297,34 @@ Decisões do Felipe (plano com 5 perguntas; números provisórios, em `balance.t
 - **Simulação** (mesma régua, 200 seeds): sem meta continua **41%** (o Sanctum não mexe na run base). Com o Sanctum no máximo: **vence 59%**, 69% chegam ao boss e 85% deles o derrotam, nível médio 11,7, ATK final 25,2. Rodar: `SIM=200 npx vitest run src/core/sim --silent=false` (imprime as duas).
 - Detalhes técnicos: o `InputController` ignora o primeiro frame do controle (botão que confirmou a troca de cena não dispara de novo na cena nova). Cartas da tela de escolha encolhem pra caber 4.
 
-### Marco 6 — Polish
-Balanceamento com simulação headless, tween de movimento (100 ms), screenshake leve, sprites Kenney, fonte pixel, tela inicial, áudio.
+### Marco 6 — Polish (dividido em 6a e 6b em 02/10/2026)
+
+#### ✅ Marco 6a — Balanceamento (entregue em 02/10/2026)
+Só números e fórmula; nada visual, o save não muda de versão. 277 testes.
+Decisões do Felipe:
+- **DEF em porcentagem** (§2.12, opção A): `dano = rolagem × 20 / (20 + DEF)`.
+- **Meta de dificuldade (opção C):** bot sem meta vencendo ~15%. Pro Sanctum no máximo a meta era ~35%, mas medido não dá pra separar as duas coisas mexendo só em monstro (o Sanctum vale ~30 pontos). O Felipe escolheu **manter os efeitos do Sanctum** e aceitar o máximo onde cair (opção B), porque as salas e andares futuros vão mexer nesse winrate quando o jogo estiver completo.
+- **Sanctum (3C) e relíquias (4B): preços ficam como estão.**
+Ajustes (todos medidos na simulação, 200 seeds; ruído de ±3 pontos entre rodadas):
+- **Knight ATK base 7 → 8** (ATK 11 com a Sword). Com a DEF em porcentagem, ATK é o que mais pesa: +1 ATK subiu o bot de ~9% pra ~15%. Mais HP quase não muda (Knight com 60 de HP: igual).
+- **Orc ATK 16 → 14** e **Skeleton ATK 11 → 10**: com a fórmula nova eles batem de verdade; os valores antigos faziam do andar 3 um muro.
+- **Andar 3: 0–2 monstros por sala** (era 0–3), mesma razão.
+- **Orc Warlord DEF 4 → 2** (o §2.2 não fixa a DEF): sem isso, de quem chega ao boss o bot vence só ~24% (com DEF 2, ~30–38%).
+- Testados e descartados (efeito dentro do ruído): cura por kill 3 (fica 2), mistura do andar 4 com menos Orc.
+- Peso de cada upgrade do Sanctum (no máximo, sozinho, com os números de antes do ATK 8; base ~9%): Afiar 27% · Tome (Saber + Releitura) 30% · Reforçar 13%.
+
+| Simulação (200 seeds) | Marco 5 | Só a fórmula nova | **Marco 6a** |
+|---|---|---|---|
+| Sem meta: vence | 41% | 7% | **14%** |
+| Sem meta: chega ao boss / mata (de quem chega) | 66% / 62% | 27% / 24% | **46% / 30%** |
+| Sem meta: mortes por andar (1–5) | 19/9/24/16/50 | 19/19/69/39/41 | **19/19/35/35/64** |
+| Sanctum no máximo: vence | 59% | 47% | **42%** |
+| Gold de kills por run (sem meta) | 119 | — | **78** |
+
+- **Efeito colateral:** como o bot morre mais cedo, a renda de gold caiu (~78g por run sem meta). O Sanctum (2.490g) fica ainda mais longo de completar; o Felipe decidiu manter os preços por ora (3C).
+
+#### Marco 6b — Polish
+Tween de movimento (100 ms), screenshake leve, sprites Kenney, fonte pixel, capricho visual no Sanctum (já é a tela inicial), áudio.
 
 **Pós-MVP (v1.1+):** Sorcerer/Paladin/Druid, Floors 6–15, Dragon/Demon/Lich/Vampire, bosses 10/15, Bestiary progressivo, conquistas, toque na tela, modo fliperama (atração, ranking de 3 iniciais).
 
@@ -330,8 +356,8 @@ Balanceamento com simulação headless, tween de movimento (100 ms), screenshake
   - [x] Marco 5 (decidido em 01/10/2026, números provisórios): custos e efeitos de The Vault, Ancient Armory e Tome of Knowledge; conversão do gold no fim da run. Tudo na §5, Marco 5.
 - [x] Passar o turno: Espaço / X (Marco 1).
 - [x] Mapeamento das skills no controle (Marco 3): LB/RB + A/B/X/Y (§4.3).
-- [ ] Empilhamento de DEF (§2.12) — **confirmado no Marco 4** (Skeleton dá ~1 de dano no fim): decidir no Marco 6.
-- [ ] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** A simulação diz 41%, mas o bot é fraco; jogador de verdade vence com folga. Endurecer no Marco 6 (junto com o risco de DEF da §2.12, que é provavelmente a maior causa: Skeleton/Orc batendo 1 no fim).
+- [x] Empilhamento de DEF (§2.12): resolvido no Marco 6a com a redução percentual.
+- [x] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** Endurecida no Marco 6a (bot sem meta de 41% pra ~14%). Falta o Felipe confirmar jogando.
 - [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6.
 - [ ] Custo total do Sanctum (2.490g) vs. renda de gold por run: provavelmente runs demais pra completar. Revisar no Marco 6.
 

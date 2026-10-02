@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '../actions';
 import { KILL_HEAL, KNIGHT_START_MANA, MANA_PER_KILL, ROOMS_PER_TRAINING, TRAINING_BONUS } from '../balance';
-import { damageRange } from '../combat/damage';
+import { damageRange, mitigate } from '../combat/damage';
 import { ENTITY_TEMPLATES } from '../data/entities';
 import { getTile, setTile, TileType } from '../dungeon/DungeonMap';
 import { createEntity, type Entity } from '../entities/Entity';
@@ -35,9 +35,9 @@ const attacksBy = (events: readonly CoreEvent[], id: string) =>
   events.filter((e): e is Extract<CoreEvent, { type: 'attacked' }> => e.type === 'attacked' && e.attackerId === id);
 
 describe('Knight: estado inicial', () => {
-  it('começa com Sword equipada (ATK 10), DEF 5 e 30 de mana', () => {
+  it('começa com Sword equipada (ATK 11), DEF 5 e 30 de mana', () => {
     const state = createTestRun(1);
-    expect(getPlayer(state).atk).toBe(10);
+    expect(getPlayer(state).atk).toBe(11);
     expect(getPlayer(state).def).toBe(5);
     expect(state.hero.equipment).toEqual({ weapon: 'sword' });
     expect(state.hero.mana).toBe(KNIGHT_START_MANA);
@@ -47,7 +47,10 @@ describe('Knight: estado inicial', () => {
 
 describe('skills', () => {
   it('Brutal Strike: gasta 5 de mana e bate com ATK×2', () => {
-    const { min, max } = damageRange(20);
+    // ATK 11 × 2 = 22, contra o Goblin dummy de DEF 1 (× 20/21)
+    const range = damageRange(22);
+    const min = mitigate(range.min, 1);
+    const max = mitigate(range.max, 1);
     for (let seed = 1; seed <= 30; seed++) {
       const state = arena([{ x: 8, y: 5 }], seed);
       state.entities[1]!.hp = 999;
@@ -56,8 +59,8 @@ describe('skills', () => {
       expect(r.tookTurn).toBe(true);
       expect(r.events[0]).toEqual({ type: 'skill-used', entityId: 'player', skillId: 'brutalStrike' });
       const [hit] = attacksBy(r.events, 'player');
-      expect(hit!.damage).toBeGreaterThanOrEqual(min - 1);
-      expect(hit!.damage).toBeLessThanOrEqual(max - 1);
+      expect(hit!.damage).toBeGreaterThanOrEqual(min);
+      expect(hit!.damage).toBeLessThanOrEqual(max);
       expect(state.hero.mana).toBe(KNIGHT_START_MANA - 5);
     }
   });
@@ -127,7 +130,7 @@ describe('skills', () => {
       const state = arena([{ x: 8, y: 5 }], 5);
       state.entities[1]!.hp = 999;
       const r = resolvePlayerAction(state, skill(slot));
-      // ATK 10: básico rola até 13; ×1,5 começa em 11 e ×2 em 15 (menos DEF 1)
+      // ATK 11: básico rola até 14 (13 depois da DEF 1); ×1,5 começa em 12 e ×2 em 16
       expect(attacksBy(r.events, 'player')[0]!.damage).toBeGreaterThanOrEqual(slot === 1 ? 14 : 10);
     }
   });
@@ -227,10 +230,10 @@ describe('equipamento', () => {
     receiveItem(state.hero, player, 'spikeSword', events);
     expect(state.hero.equipment.weapon).toBe('spikeSword');
     expect(state.hero.bag).toEqual(['sword']);
-    expect(player.atk).toBe(15);
+    expect(player.atk).toBe(16);
     expect(events).toEqual([
       { type: 'looted', itemId: 'spikeSword', equipped: true },
-      { type: 'stats-changed', atk: { from: 10, to: 15 }, def: { from: 5, to: 5 } },
+      { type: 'stats-changed', atk: { from: 11, to: 16 }, def: { from: 5, to: 5 } },
     ]);
 
     // Pior ou igual: inventário
@@ -303,7 +306,7 @@ describe('salas exploradas e Training Room', () => {
       reason: 'free-action',
       events: [
         { type: 'trained', stat: 'def', amount: TRAINING_BONUS },
-        { type: 'stats-changed', atk: { from: 10, to: 10 }, def: { from: 5, to: 5 + TRAINING_BONUS } },
+        { type: 'stats-changed', atk: { from: 11, to: 11 }, def: { from: 5, to: 5 + TRAINING_BONUS } },
       ],
     });
     expect(getPlayer(state).def).toBe(5 + TRAINING_BONUS);
@@ -316,6 +319,6 @@ describe('salas exploradas e Training Room', () => {
     const state = createTestRun(1);
     state.hero.trainedAtk = 2;
     refreshPlayerStats(state.hero, getPlayer(state));
-    expect(getPlayer(state).atk).toBe(12);
+    expect(getPlayer(state).atk).toBe(13);
   });
 });

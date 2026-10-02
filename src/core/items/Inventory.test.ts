@@ -17,9 +17,9 @@ describe('inventário: equipar, desequipar e usar', () => {
     expect(r.tookTurn).toBe(true);
     expect(state.hero.equipment.weapon).toBe('spikeSword');
     expect(state.hero.bag).toEqual(['sword']);
-    expect(getPlayer(state).atk).toBe(15);
+    expect(getPlayer(state).atk).toBe(16);
     expect(r.events).toContainEqual({ type: 'equipped', itemId: 'spikeSword' });
-    expect(r.events).toContainEqual({ type: 'stats-changed', atk: { from: 10, to: 15 }, def: { from: 5, to: 5 } });
+    expect(r.events).toContainEqual({ type: 'stats-changed', atk: { from: 11, to: 16 }, def: { from: 5, to: 5 } });
     expect(state.turn).toBe(1);
   });
 
@@ -29,7 +29,7 @@ describe('inventário: equipar, desequipar e usar', () => {
     resolvePlayerAction(state, { type: 'equip', itemId: 'spikeSword' });
     resolvePlayerAction(state, { type: 'equip', itemId: 'sword' });
     expect(state.hero.equipment.weapon).toBe('sword');
-    expect(getPlayer(state).atk).toBe(10);
+    expect(getPlayer(state).atk).toBe(11);
   });
 
   it('desequipar guarda na mochila e tira o bônus', () => {
@@ -38,7 +38,7 @@ describe('inventário: equipar, desequipar e usar', () => {
     expect(r.tookTurn).toBe(true);
     expect(state.hero.equipment.weapon).toBeUndefined();
     expect(state.hero.bag).toEqual(['sword']);
-    expect(getPlayer(state).atk).toBe(7);
+    expect(getPlayer(state).atk).toBe(8);
   });
 
   it('falhas não gastam turno nem mudam nada', () => {

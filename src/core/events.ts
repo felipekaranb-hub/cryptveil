@@ -68,7 +68,7 @@ export type CoreEvent =
   | { readonly type: 'card-offered'; readonly offer: readonly CardId[]; readonly rerolled?: boolean }
   /** Carta escolhida. `level` = nível da skill ou pilhas da passiva depois da escolha. */
   | { readonly type: 'card-picked'; readonly cardId: CardId; readonly level: number }
-  /** ATK/DEF efetivos do player mudaram (equipou, treinou): a view mostra "ATK 10 → 16". */
+  /** ATK/DEF efetivos do player mudaram (equipou, treinou): a view mostra "ATK 11 → 16". */
   | {
       readonly type: 'stats-changed';
       readonly atk: { readonly from: number; readonly to: number };
