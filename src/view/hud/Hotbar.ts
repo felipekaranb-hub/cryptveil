@@ -12,8 +12,8 @@ const TOP = GAME_HEIGHT - 88;
 const LEFT = HUD_CENTER_X - (8 * BOX_W + 7 * GAP) / 2;
 
 const HELP = {
-  keyboard: 'WASD: mover/atacar  ·  Espaço: passar  ·  1–8: hotbar  ·  I: inventário  ·  Enter: confirmar',
-  gamepad: 'D-pad: mover/atacar  ·  X: passar  ·  LB/RB + A/B/X/Y: hotbar  ·  Y: inventário  ·  A: confirmar',
+  keyboard: 'WASD: mover/atacar  ·  Espaço: passar  ·  1–8: hotbar  ·  I: inventário  ·  Enter: confirmar  ·  M: som',
+  gamepad: 'D-pad: mover/atacar  ·  X: passar  ·  LB/RB + A/B/X/Y: hotbar  ·  Y: inventário  ·  A: confirmar  ·  Select: som',
 } as const;
 
 /** Rótulo do slot: tecla (1–8) ou combo do controle (LB+A … RB+Y). */

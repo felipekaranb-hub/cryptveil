@@ -6,6 +6,12 @@
 /** Tamanho do tile na tela (handoff §2.11 — não revisitar no MVP). */
 export const TILE_SIZE = 32;
 
+/**
+ * Animação de um passo (Marco 6b). Menor que a repetição de movimento do
+ * InputController (130 ms), então segurar a direção nunca acumula atraso.
+ */
+export const MOVE_TWEEN_MS = 100;
+
 /** Área visível do mapa, em tiles. */
 export const VIEWPORT_W = 15;
 export const VIEWPORT_H = 11;
@@ -72,7 +78,15 @@ export const POP_COLORS = {
   MANA: '#6fa8e8',
 } as const;
 
-export const FONT_FAMILY = 'monospace';
+/**
+ * Fonte pixel em tudo (decisão do Felipe, Marco 6b): VT323 (OFL), empacotada
+ * pelo @fontsource (funciona offline no fliperama). Ela é menor que a
+ * monospace no mesmo tamanho: FONT_SCALE converte os tamanhos do layout.
+ */
+export const FONT_FAMILY = "'VT323', monospace";
+export const FONT_SCALE = 1.4;
+/** Espaço extra entre letras (px): também desliga as ligaduras da fonte (ver textStyle). */
+export const TEXT_LETTER_SPACING = 0.5;
 
 export const SCENE_KEYS = {
   BOOT: 'boot',

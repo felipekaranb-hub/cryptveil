@@ -29,8 +29,8 @@ type KeyMap = Record<string, Phaser.Input.Keyboard.Key>;
  *
  * Mapeamento (handoff §4.3):
  *   Teclado  — WASD/Setas: mover/atacar · Espaço: passar turno · 1–8: hotbar · I: inventário
- *              Enter: confirmar · Esc: cancelar · Q/E: aba anterior/próxima
- *   Controle — D-pad/analógico: mover/atacar · X: passar turno · A: confirmar · B: cancelar · Y: inventário
+ *              Enter: confirmar · Esc: cancelar · Q/E: aba anterior/próxima · M: mudo
+ *   Controle — D-pad/analógico: mover/atacar · X: passar turno · A: confirmar · B: cancelar · Y: inventário · Select: mudo
  *              Segurando LB: A/B/X/Y = hotbar 1–4 · Segurando RB: A/B/X/Y = hotbar 5–8 (Marco 3)
  *              LB/RB sozinhos: aba anterior/próxima (só a tela de inventário usa)
  */
@@ -42,7 +42,7 @@ export class InputController {
   private heldSource: InputSource = 'keyboard';
   private nextRepeatAt = 0;
 
-  private prevPadButtons = { A: false, B: false, X: false, Y: false, LB: false, RB: false };
+  private prevPadButtons = { A: false, B: false, X: false, Y: false, LB: false, RB: false, SELECT: false };
   /**
    * Primeiro frame só lê o estado do controle: botão que já vinha apertado
    * da cena anterior (A que confirmou a troca de cena) não dispara de novo.
@@ -56,7 +56,7 @@ export class InputController {
     const kb = scene.input.keyboard;
     this.keys = kb
       ? (kb.addKeys(
-          'W,A,S,D,UP,DOWN,LEFT,RIGHT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,I,ENTER,SPACE,ESC,Q,E',
+          'W,A,S,D,UP,DOWN,LEFT,RIGHT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,I,ENTER,SPACE,ESC,Q,E,M',
         ) as KeyMap)
       : null;
   }
@@ -146,6 +146,7 @@ export class InputController {
     if (just('ESC')) this.emit({ type: 'cancel' }, 'keyboard');
     if (just('Q')) this.emit({ type: 'page', delta: -1 }, 'keyboard');
     if (just('E')) this.emit({ type: 'page', delta: 1 }, 'keyboard');
+    if (just('M')) this.emit({ type: 'mute' }, 'keyboard');
   }
 
   private updateGamepadButtons(): void {
@@ -158,6 +159,8 @@ export class InputController {
       Y: pad.Y,
       LB: pad.L1 > SHOULDER_THRESHOLD,
       RB: pad.R1 > SHOULDER_THRESHOLD,
+      // Select/Back (botão 8 no mapeamento padrão): mudo (Marco 6b)
+      SELECT: pad.buttons[8]?.pressed === true,
     };
     const prev = this.prevPadButtons;
     this.prevPadButtons = now;
@@ -167,6 +170,7 @@ export class InputController {
     }
     const pressed = (b: keyof typeof now): boolean => now[b] && !prev[b];
 
+    if (pressed('SELECT')) this.emit({ type: 'mute' }, 'gamepad');
     if (pressed('LB')) this.emit({ type: 'page', delta: -1 }, 'gamepad');
     if (pressed('RB')) this.emit({ type: 'page', delta: 1 }, 'gamepad');
 

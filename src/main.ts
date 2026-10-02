@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import '@fontsource/vt323/400.css';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from './config/display';
 import { BootScene } from './scenes/BootScene';
 import { GameOverScene } from './scenes/GameOverScene';
@@ -6,6 +7,10 @@ import { GameScene } from './scenes/GameScene';
 import { HubScene } from './scenes/HubScene';
 import { UIScene } from './scenes/UIScene';
 import { installRenderScaling } from './view/scaling';
+
+// O Phaser desenha texto em canvas: a fonte tem que estar carregada antes
+// do primeiro texto, senão ele sai na fonte de fallback e não redesenha.
+await document.fonts.load(`20px 'VT323'`).catch(() => undefined);
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

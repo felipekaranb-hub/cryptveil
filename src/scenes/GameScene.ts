@@ -8,7 +8,8 @@ import { DIRECTIONS, inBounds, step } from '../core/grid';
 import { randomSeed } from '../core/rng';
 import { createRun, getEntity, getPlayer, type RunState } from '../core/run';
 import { resolvePlayerAction } from '../core/turn/TurnManager';
-import { COLORS, FOG, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_COLORS, TILE_SIZE } from '../config/display';
+import { COLORS, FOG, MAP_VIEW, POP_COLORS, SCENE_KEYS, TILE_SIZE } from '../config/display';
+import { ATLAS, SPRITE_SCALE, SPRITE_TINTS, TILE_FRAMES } from '../config/sprites';
 import { InputController, type InputSource } from '../input/InputController';
 import { clearRun, loadRun, saveRun } from '../storage/runStorage';
 import { closeRun, loadMeta } from '../storage/metaStorage';
@@ -27,6 +28,7 @@ import {
   type InventoryRow,
 } from '../view/hud/model';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
+import { playSfx, toggleMute } from '../view/audio/sfx';
 
 /** Como a GameScene começa: run nova com esse seed, ou a run suspensa (resume). */
 export interface GameSceneData {
@@ -61,7 +63,7 @@ export class GameScene extends Phaser.Scene {
   /** Monstros que arremessaram neste turno: aparecem mesmo fora da visão. */
   private readonly revealedThisTurn = new Set<string>();
   private readonly views = new Map<string, EntityView>();
-  private mapGraphics: Phaser.GameObjects.Graphics | null = null;
+  private mapGraphics: Phaser.GameObjects.Container | null = null;
   /** Opção destacada na escolha aberta (carta ou Training Room). */
   private choice = 0;
   private controls!: InputController;
@@ -134,6 +136,7 @@ export class GameScene extends Phaser.Scene {
 
   override update(time: number): void {
     this.controls.update(time);
+    this.centerCamera();
   }
 
   // ---------------------------------------------------------------- andar
@@ -161,12 +164,16 @@ export class GameScene extends Phaser.Scene {
   private centerCamera(): void {
     if (!this.state) return;
     const { map } = this.state;
-    const p = getPlayer(this.state).pos;
+    // Segue a view (que anima o passo); sem view ainda, o tile do core
+    const view = this.views.get(this.state.playerId)?.container;
+    const tile = getPlayer(this.state).pos;
+    const cx = view ? view.x : tile.x * TILE_SIZE + TILE_SIZE / 2;
+    const cy = view ? view.y : tile.y * TILE_SIZE + TILE_SIZE / 2;
     const clamp = (target: number, view: number, world: number): number =>
       world <= view ? (world - view) / 2 : Math.min(Math.max(target - view / 2, 0), world - view);
     this.cameras.main.setScroll(
-      clamp(p.x * TILE_SIZE + TILE_SIZE / 2, MAP_VIEW.width, map.width * TILE_SIZE),
-      clamp(p.y * TILE_SIZE + TILE_SIZE / 2, MAP_VIEW.height, map.height * TILE_SIZE),
+      clamp(cx, MAP_VIEW.width, map.width * TILE_SIZE),
+      clamp(cy, MAP_VIEW.height, map.height * TILE_SIZE),
     );
   }
 
@@ -175,59 +182,69 @@ export class GameScene extends Phaser.Scene {
     this.mapGraphics = this.drawMap();
   }
 
-  private drawMap(): Phaser.GameObjects.Graphics {
+  /**
+   * Andar com os sprites do atlas (Marco 6b). Parede só aparece onde encosta
+   * em chão: com chão logo abaixo é a face de tijolo, senão o topo escuro com
+   * uma borda de pedra do lado do chão (desenhada em código, sem autotile).
+   */
+  private drawMap(): Phaser.GameObjects.Container {
     const { map } = this.state;
-    const g = this.add.graphics();
+    const parts: Phaser.GameObjects.GameObject[] = [];
+    const rim = this.add.graphics();
+    const img = (frame: number, x: number, y: number, tint: number): void => {
+      parts.push(
+        this.add
+          .image(x * TILE_SIZE, y * TILE_SIZE, ATLAS.key, frame)
+          .setOrigin(0)
+          .setScale(SPRITE_SCALE)
+          .setTint(tint),
+      );
+    };
+    const floorFrame = (x: number, y: number): number => {
+      const variants = TILE_FRAMES.floor;
+      return variants[(x * 7 + y * 13 + ((x * y) % 5)) % variants.length] as number;
+    };
+    const isWall = (p: { x: number; y: number }): boolean => getTile(map, p) === TileType.WALL;
+
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const p = { x, y };
-        const px = x * TILE_SIZE;
-        const py = y * TILE_SIZE;
         const tile = getTile(map, p);
         if (tile === TileType.WALL) {
-          // Só desenha parede que encosta em chão; o resto é rocha (fundo)
-          const touchesFloor = DIRECTIONS.some((d) => getTile(map, step(p, d)) !== TileType.WALL);
+          const touchesFloor = DIRECTIONS.some((d) => !isWall(step(p, d)));
           if (!touchesFloor) continue;
-          g.fillStyle(TILE_COLORS.WALL, 1);
-          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          g.fillStyle(TILE_COLORS.WALL_EDGE, 1);
-          g.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        } else if (tile === TileType.STAIRS) {
-          g.fillStyle(TILE_COLORS.STAIRS, 1);
-          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          // Degraus provisórios até os sprites do Marco 6
-          g.fillStyle(TILE_COLORS.STAIRS_STEP, 1);
-          for (let i = 0; i < 4; i++) g.fillRect(px + 4 + i * 3, py + 6 + i * 6, TILE_SIZE - 8 - i * 6, 3);
-        } else if (tile === TileType.TRAINING) {
-          // Altar de treino provisório: quadrado roxo com moldura dourada
-          g.fillStyle(TILE_COLORS.TRAINING, 1);
-          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          g.lineStyle(2, TILE_COLORS.TRAINING_MARK, 1);
-          g.strokeRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
-          g.fillStyle(TILE_COLORS.TRAINING_MARK, 1);
-          g.fillRect(px + 13, py + 9, 6, 14);
-          g.fillRect(px + 9, py + 13, 14, 6);
-        } else if (tile === TileType.MERCHANT) {
-          // Mercador provisório: balcão marrom com moeda dourada
-          g.fillStyle(TILE_COLORS.MERCHANT, 1);
-          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          g.fillStyle(TILE_COLORS.MERCHANT_COIN, 1);
-          g.fillCircle(px + TILE_SIZE / 2, py + TILE_SIZE / 2, 8);
-          g.fillStyle(TILE_COLORS.MERCHANT, 1);
-          g.fillRect(px + TILE_SIZE / 2 - 1, py + 10, 2, 12);
-        } else {
-          const light = (x + y) % 2 === 0;
-          g.fillStyle(light ? TILE_COLORS.FLOOR_LIGHT : TILE_COLORS.FLOOR_DARK, 1);
-          g.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          if (!isWall(step(p, 'S'))) {
+            img(TILE_FRAMES.wallFace, x, y, SPRITE_TINTS.wall);
+          } else {
+            img(TILE_FRAMES.wallTop, x, y, SPRITE_TINTS.wall);
+            // Borda de pedra nos lados que dão pra chão (o topo de baixo vira face)
+            rim.fillStyle(SPRITE_TINTS.wallRim, 1);
+            const px = x * TILE_SIZE;
+            const py = y * TILE_SIZE;
+            if (!isWall(step(p, 'N'))) rim.fillRect(px, py, TILE_SIZE, 4);
+            if (!isWall(step(p, 'W'))) rim.fillRect(px, py, 4, TILE_SIZE);
+            if (!isWall(step(p, 'E'))) rim.fillRect(px + TILE_SIZE - 4, py, 4, TILE_SIZE);
+          }
+          continue;
         }
+        img(floorFrame(x, y), x, y, SPRITE_TINTS.floor);
+        if (tile === TileType.STAIRS) img(TILE_FRAMES.stairs, x, y, SPRITE_TINTS.object);
+        else if (tile === TileType.TRAINING) img(TILE_FRAMES.training, x, y, SPRITE_TINTS.object);
+        else if (tile === TileType.MERCHANT) img(TILE_FRAMES.merchant, x, y, SPRITE_TINTS.object);
       }
     }
-    return g.setDepth(-1);
+    parts.push(rim);
+    return this.add.container(0, 0, parts).setDepth(-1);
   }
 
   // ------------------------------------------------------------------- turno
 
   private handleAction(action: Action): void {
+    if (action.type === 'mute') {
+      const muted = toggleMute();
+      emitGameEvent(this.game.events, 'log', { lines: [{ text: muted ? 'Som desligado (M / Select)' : 'Som ligado', tone: 'muted' }] });
+      return;
+    }
     if (this.mode === 'inventory') {
       this.handleInventoryInput(action);
       return;
@@ -267,7 +284,10 @@ export class GameScene extends Phaser.Scene {
     if (!result.tookTurn) {
       // Parede fica quieta; skill sem mana/alvo avisa no LOG
       const warning = formatFailure(result);
-      if (warning) emitGameEvent(this.game.events, 'log', { lines: [{ text: warning, tone: 'muted' }] });
+      if (warning) {
+        playSfx('uiDeny');
+        emitGameEvent(this.game.events, 'log', { lines: [{ text: warning, tone: 'muted' }] });
+      }
       return false;
     }
     this.playEvents(result.events);
@@ -347,6 +367,7 @@ export class GameScene extends Phaser.Scene {
         if (action.dir === 'N' || action.dir === 'S') {
           const dir = action.dir === 'N' ? -1 : 1;
           const next = this.firstSelectable(rows, this.invSelected + dir, dir);
+          if (next >= 0 && next !== this.invSelected) playSfx('uiMove');
           if (next >= 0) this.invSelected = next;
         } else {
           this.switchTab(action.dir === 'W' ? -1 : 1);
@@ -430,7 +451,9 @@ export class GameScene extends Phaser.Scene {
     const count = this.choiceOptions().length;
     if (action.type === 'move' && (action.dir === 'W' || action.dir === 'E')) {
       const delta = action.dir === 'W' ? -1 : 1;
-      this.choice = Math.min(count - 1, Math.max(0, this.choice + delta));
+      const next = Math.min(count - 1, Math.max(0, this.choice + delta));
+      if (next !== this.choice) playSfx('uiMove');
+      this.choice = next;
       this.emitChoice();
       return;
     }
@@ -487,8 +510,8 @@ export class GameScene extends Phaser.Scene {
 
       switch (event.type) {
         case 'moved':
+          // A câmera segue a view do player no update(), acompanhando a animação
           this.views.get(event.entityId)?.setTile(event.to);
-          if (event.entityId === this.state.playerId) this.centerCamera();
           break;
         case 'attacked': {
           if (event.ranged) {
@@ -498,11 +521,14 @@ export class GameScene extends Phaser.Scene {
           }
           const target = getEntity(this.state, event.targetId);
           const view = this.views.get(event.targetId);
+          if (target) this.views.get(event.attackerId)?.faceTowards(target.pos);
           if (target && view) {
             view.setHp(event.targetHp, target.maxHp);
             view.flash();
           }
           const onPlayer = event.targetId === this.state.playerId;
+          if (event.ranged) playSfx('throw');
+          playSfx(onPlayer ? 'hurt' : event.critical ? 'crit' : 'hit');
           pop(
             event.targetId,
             `-${event.damage}${event.critical ? '!' : ''}`,
@@ -514,31 +540,38 @@ export class GameScene extends Phaser.Scene {
         }
         case 'died':
           this.views.get(event.entityId)?.die();
+          playSfx(event.entityId === this.state.playerId ? 'death' : 'kill');
+          // Boss caiu ou o Knight morreu: tremida mais forte (Marco 6b)
+          if (event.entityId === this.state.playerId || getEntity(this.state, event.entityId)?.boss) {
+            this.cameras.main.shake(260, 0.01);
+          }
           break;
         case 'healed':
           this.views.get(event.entityId)?.setHp(event.hp, getEntity(this.state, event.entityId)?.maxHp ?? event.hp);
-          if (event.source !== 'passive') this.views.get(event.entityId)?.flashHeal();
+          if (event.source !== 'passive') {
+            this.views.get(event.entityId)?.flashHeal();
+            playSfx('heal');
+          }
           pop(event.entityId, `+${event.amount}`, POP_COLORS.HEAL);
           break;
         case 'mana-restored':
           pop(this.state.playerId, `+${event.amount}`, POP_COLORS.MANA);
           break;
         case 'leveled-up': {
+          playSfx('levelUp');
           const p = getPlayer(this.state);
           this.views.get(p.id)?.setHp(p.hp, p.maxHp);
           this.views.get(p.id)?.flashHeal();
           break;
         }
-        case 'training-offered':
-        case 'card-offered':
-          this.openChoice();
-          break;
         case 'summoned': {
+          playSfx('summon');
           const orc = getEntity(this.state, event.entityId);
           if (orc) this.views.set(orc.id, new EntityView(this, orc));
           break;
         }
         case 'enraged':
+          playSfx('enrage');
           this.views.get(event.entityId)?.setEnraged();
           this.cameras.main.shake(120, 0.006);
           break;
@@ -552,13 +585,16 @@ export class GameScene extends Phaser.Scene {
           this.closeInventory();
           break;
         case 'trained':
+          playSfx('uiConfirm');
           this.redrawMap(); // o altar vira chão
           emitGameEvent(this.game.events, 'choice-closed', {});
           break;
         case 'card-picked':
+          playSfx('uiConfirm');
           emitGameEvent(this.game.events, 'choice-closed', {});
           break;
         case 'descended':
+          playSfx('stairs');
           // O core já trocou mapa e monstros: redesenha tudo e suspende a run
           this.buildFloor();
           this.cameras.main.fadeIn(250);
@@ -566,6 +602,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'victory':
         case 'defeat':
+          if (event.type === 'victory') playSfx('victory');
           // Roguelite: run acabada não tem "Continuar". O gold converte agora,
           // antes do resumo: fechar a aba aqui não perde nada.
           clearRun();
@@ -580,10 +617,23 @@ export class GameScene extends Phaser.Scene {
         case 'countered':
         case 'stats-changed':
         case 'rewarded':
-        case 'looted':
         case 'room-cleared':
         case 'bought':
+          playSfx('buy');
+          break;
         case 'sold':
+          playSfx('gold');
+          break;
+        case 'looted':
+          playSfx('loot');
+          break;
+        case 'card-offered':
+          if (event.rerolled) playSfx('uiConfirm');
+          this.openChoice();
+          break;
+        case 'training-offered':
+          this.openChoice();
+          break;
         case 'equipped':
         case 'unequipped':
           break;

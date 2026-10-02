@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { COLORS, TEXT_COLORS } from '../../config/display';
+import { COLORS, FONT_SCALE, TEXT_COLORS } from '../../config/display';
+import { ATLAS, ITEM_FRAMES } from '../../config/sprites';
 import type { EquipSlot } from '../../core/items/Item';
 import type { HudSnapshot } from './model';
 import { LEFT_X, PANEL_H, PANEL_TOP, PANEL_W, textStyle } from './ui';
@@ -43,6 +44,8 @@ const EMPTY_LABEL: Readonly<Record<EquipSlot, string>> = {
 interface SlotView {
   readonly box: Phaser.GameObjects.Rectangle;
   readonly label: Phaser.GameObjects.Text;
+  /** Ícone do item (Marco 6b); item sem ícone no atlas continua com a sigla. */
+  readonly icon: Phaser.GameObjects.Image;
 }
 
 /** Painel esquerdo: HP/Mana/XP, ATK/DEF, gold, paper doll de 8 slots e 3 relíquias. */
@@ -95,7 +98,8 @@ export class StatusPanel {
   private slotBox(scene: Phaser.Scene, x: number, y: number): SlotView {
     const box = scene.add.rectangle(x, y, SLOT, SLOT, 0x161616).setOrigin(0).setStrokeStyle(1, COLORS.FRAME);
     const label = scene.add.text(x + SLOT / 2, y + SLOT / 2, '', textStyle(8, TEXT_COLORS.MUTED)).setOrigin(0.5);
-    return { box, label };
+    const icon = scene.add.image(x + SLOT / 2, y + SLOT / 2, ATLAS.key, 0).setScale(1.5).setVisible(false);
+    return { box, label, icon };
   }
 
   update(s: HudSnapshot): void {
@@ -114,12 +118,18 @@ export class StatusPanel {
     for (const g of s.gear) {
       const view = this.slots.get(g.slot);
       if (!view) continue;
+      const frame = g.itemId ? ITEM_FRAMES[g.itemId] : undefined;
+      view.icon.setVisible(frame !== undefined);
+      if (frame !== undefined) view.icon.setFrame(frame);
       if (g.item) {
         view.box.setStrokeStyle(1, COLORS.GOLD);
-        view.label.setText(initials(g.item)).setColor(TEXT_COLORS.PRIMARY).setFontSize(10).setFontStyle('bold');
+        view.label
+          .setText(frame !== undefined ? '' : initials(g.item))
+          .setColor(TEXT_COLORS.PRIMARY)
+          .setFontSize(Math.round(10 * FONT_SCALE));
       } else {
         view.box.setStrokeStyle(1, COLORS.FRAME);
-        view.label.setText(EMPTY_LABEL[g.slot]).setColor(TEXT_COLORS.MUTED).setFontSize(8).setFontStyle('');
+        view.label.setText(EMPTY_LABEL[g.slot]).setColor(TEXT_COLORS.MUTED).setFontSize(Math.round(8 * FONT_SCALE));
       }
     }
     s.relics.forEach((r, i) => {

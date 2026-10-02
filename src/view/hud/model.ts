@@ -33,6 +33,8 @@ export interface GearSlotView {
   readonly label: string;
   /** Nome do item, ou null se vazio. */
   readonly item: string | null;
+  /** Id do item (a view acha o ícone), ou null se vazio. */
+  readonly itemId: ItemId | null;
 }
 
 export type HotbarState = 'ready' | 'locked' | 'unusable' | 'empty';
@@ -83,7 +85,7 @@ export function buildHud(state: RunState): HudSnapshot {
     floor: state.floor,
     gear: GEAR_SLOTS.map(({ slot, label }) => {
       const id = hero.equipment[slot];
-      return { slot, label, item: id ? getItem(id).name : null };
+      return { slot, label, item: id ? getItem(id).name : null, itemId: id ?? null };
     }),
     relics: Array.from({ length: RELIC_SLOTS }, (_, i) => {
       const id = hero.relics[i];

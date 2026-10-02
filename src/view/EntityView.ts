@@ -1,57 +1,74 @@
 import Phaser from 'phaser';
 import type { Entity } from '../core/entities/Entity';
 import type { Point } from '../core/grid';
-import { COLORS, FONT_FAMILY, TILE_SIZE } from '../config/display';
+import { COLORS, FONT_FAMILY, MOVE_TWEEN_MS, TEXT_LETTER_SPACING, TILE_SIZE } from '../config/display';
+import { ATLAS, BOSS_SCALE, ENTITY_FALLBACK_FRAME, ENTITY_FRAMES, SPRITE_SCALE, SPRITE_TINTS } from '../config/sprites';
 import { getRenderScale } from './scaling';
 
-const BODY_SIZE = TILE_SIZE - 6;
 const BAR_W = TILE_SIZE - 6;
 const BAR_H = 3;
 
-const BODY_COLORS = {
-  player: COLORS.BLOOD_RED,
-  enemy: COLORS.POISON_GREEN,
-} as const;
-
 /**
- * Desenho provisório de uma entidade: quadrado colorido + letra + barra de HP.
- * Só lê dados do core; nunca muda o estado do jogo.
- * No Marco 6 o quadrado vira sprite do Kenney, a interface continua a mesma.
+ * Desenho de uma entidade: sprite do atlas + barra de HP. Só lê dados do
+ * core; nunca muda o estado do jogo. Andar é animado (MOVE_TWEEN_MS), mas o
+ * core já está no tile novo: a animação é só apresentação.
  */
 export class EntityView {
   readonly container: Phaser.GameObjects.Container;
-  private readonly body: Phaser.GameObjects.Rectangle;
+  private readonly sprite: Phaser.GameObjects.Image;
   private readonly hpFill: Phaser.GameObjects.Rectangle;
-  private baseColor: number;
+  private baseTint: number = SPRITE_TINTS.entity;
+  private moveTween: Phaser.Tweens.Tween | null = null;
 
   constructor(
     private readonly scene: Phaser.Scene,
     entity: Entity,
   ) {
-    this.baseColor = entity.boss ? (entity.enraged ? COLORS.BOSS_ENRAGED : COLORS.BOSS) : BODY_COLORS[entity.kind];
+    const scale = SPRITE_SCALE * (entity.boss ? BOSS_SCALE : 1);
+    this.sprite = scene.add
+      .image(0, 0, ATLAS.key, ENTITY_FRAMES[entity.name] ?? ENTITY_FALLBACK_FRAME)
+      .setScale(scale)
+      // Boss maior cresce pra cima: os pés continuam no tile
+      .setOrigin(0.5, entity.boss ? 0.6 : 0.5);
+    if (entity.enraged) this.baseTint = SPRITE_TINTS.enraged;
+    this.sprite.setTint(this.baseTint);
 
-    this.body = scene.add.rectangle(0, 0, BODY_SIZE, BODY_SIZE, this.baseColor);
-    const glyph = scene.add
-      .text(0, 0, entity.glyph, {
-        fontFamily: FONT_FAMILY,
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: '#f4ecd8',
-      })
-      .setOrigin(0.5);
-
-    const barY = -TILE_SIZE / 2 + 1;
+    const barY = -TILE_SIZE / 2 - (entity.boss ? 6 : 1);
     const hpBack = scene.add.rectangle(-BAR_W / 2, barY, BAR_W, BAR_H, 0x000000).setOrigin(0, 0.5);
     this.hpFill = scene.add.rectangle(-BAR_W / 2, barY, BAR_W, BAR_H, COLORS.HP_GREEN).setOrigin(0, 0.5);
 
-    this.container = scene.add.container(0, 0, [this.body, glyph, hpBack, this.hpFill]);
-    this.setTile(entity.pos);
+    this.container = scene.add.container(0, 0, [this.sprite, hpBack, this.hpFill]);
+    this.setTile(entity.pos, false);
     this.setHp(entity.hp, entity.maxHp);
   }
 
-  /** Posiciona no centro do tile (em coordenadas do mundo). */
-  setTile(p: Point): void {
-    this.container.setPosition(p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE + TILE_SIZE / 2);
+  /**
+   * Vai pro centro do tile (coordenadas do mundo). Com `animate`, desliza
+   * em MOVE_TWEEN_MS e vira o sprite pro lado em que andou.
+   */
+  setTile(p: Point, animate = true): void {
+    const x = p.x * TILE_SIZE + TILE_SIZE / 2;
+    const y = p.y * TILE_SIZE + TILE_SIZE / 2;
+    this.moveTween?.stop();
+    this.moveTween = null;
+    if (x !== this.container.x) this.sprite.setFlipX(x < this.container.x);
+    if (!animate) {
+      this.container.setPosition(x, y);
+      return;
+    }
+    this.moveTween = this.scene.tweens.add({
+      targets: this.container,
+      x,
+      y,
+      duration: MOVE_TWEEN_MS,
+      ease: 'Sine.easeOut',
+    });
+  }
+
+  /** Vira pro alvo sem sair do lugar (ataque, arremesso). */
+  faceTowards(p: Point): void {
+    const x = p.x * TILE_SIZE + TILE_SIZE / 2;
+    if (x !== this.container.x) this.sprite.setFlipX(x < this.container.x);
   }
 
   setHp(hp: number, maxHp: number): void {
@@ -70,8 +87,8 @@ export class EntityView {
     const label = this.scene.add
       .text(x, y, text, {
         fontFamily: FONT_FAMILY,
-        fontSize: '14px',
-        fontStyle: 'bold',
+        fontSize: '20px',
+        letterSpacing: TEXT_LETTER_SPACING,
         color,
         stroke: '#000000',
         strokeThickness: 3,
@@ -92,10 +109,10 @@ export class EntityView {
     });
   }
 
-  /** Boss enfurecido: corpo fica vermelho. */
+  /** Boss enfurecido: sprite avermelhado. */
   setEnraged(): void {
-    this.baseColor = COLORS.BOSS_ENRAGED;
-    this.body.fillColor = this.baseColor;
+    this.baseTint = SPRITE_TINTS.enraged;
+    this.sprite.setTint(this.baseTint);
   }
 
   /** Pisca verde ao curar. */
@@ -109,13 +126,14 @@ export class EntityView {
   }
 
   private flashColor(color: number): void {
-    this.body.fillColor = color;
+    this.sprite.setTint(color).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(90, () => {
-      if (this.body.active) this.body.fillColor = this.baseColor;
+      if (this.sprite.active) this.sprite.setTint(this.baseTint).setTintMode(Phaser.TintModes.MULTIPLY);
     });
   }
 
   destroy(): void {
+    this.moveTween?.stop();
     this.container.destroy();
   }
 

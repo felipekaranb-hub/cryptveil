@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_HEIGHT, GAME_WIDTH, MAP_VIEW, SCENE_KEYS, TEXT_COLORS } from '../config/display';
+import { COLORS, FONT_SCALE, GAME_HEIGHT, GAME_WIDTH, MAP_VIEW, SCENE_KEYS, TEXT_COLORS } from '../config/display';
 import type { InputSource } from '../input/InputController';
 import { onGameEvent, offGameEvent, type GameEventName, type GameEvents } from '../view/events';
 import { BattleLog } from '../view/hud/BattleLog';
@@ -11,7 +11,7 @@ import { StatusPanel } from '../view/hud/StatusPanel';
 import { PANEL_H, PANEL_TOP, PANEL_W, RIGHT_X, textStyle } from '../view/hud/ui';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
-const MILESTONE = 'Marco 5';
+const MILESTONE = 'Marco 6';
 const BOSS_BAR_W = 360;
 
 /**
@@ -97,7 +97,7 @@ export class UIScene extends Phaser.Scene {
       this.inventory.close();
       this.overlayTitle
         .setText(won ? 'VICTORY' : 'YOU DIED')
-        .setFontSize(36)
+        .setFontSize(Math.round(36 * FONT_SCALE))
         .setColor(won ? TEXT_COLORS.ACCENT : '#c0392b');
       this.overlaySub.setText(`${turns} turnos  ·  Enter / A: continuar`);
       this.overlay.setVisible(true);

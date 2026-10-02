@@ -3,6 +3,7 @@ import type { RunSummary } from '../core/meta/metaProgress';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, SCENE_KEYS, TEXT_COLORS } from '../config/display';
 import { InputController } from '../input/InputController';
 import { textStyle } from '../view/hud/ui';
+import { playSfx, toggleMute } from '../view/audio/sfx';
 import { bindRenderScale, layoutCamera } from '../view/scaling';
 
 /**
@@ -64,7 +65,10 @@ export class GameOverScene extends Phaser.Scene {
 
     this.controls = new InputController(this);
     this.controls.onAction((action) => {
-      if (action.type === 'confirm') this.scene.start(SCENE_KEYS.HUB);
+      if (action.type === 'mute') toggleMute();
+      if (action.type !== 'confirm') return;
+      playSfx('uiConfirm');
+      this.scene.start(SCENE_KEYS.HUB);
     });
     bindRenderScale(this, (scale) =>
       layoutCamera(this.cameras.main, scale, { x: 0, y: 0, width: GAME_WIDTH, height: GAME_HEIGHT }),

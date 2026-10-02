@@ -1,15 +1,16 @@
 import Phaser from 'phaser';
 import { SCENE_KEYS } from '../config/display';
+import { ATLAS } from '../config/sprites';
 import type { GameSceneData } from './GameScene';
 
-/** Carrega assets (vazio até o Marco 6 trocar os quadrados por sprites). */
+/** Carrega os assets (atlas de sprites do Marco 6b) e decide a primeira cena. */
 export class BootScene extends Phaser.Scene {
   constructor() {
     super(SCENE_KEYS.BOOT);
   }
 
   preload(): void {
-    // Marco 6: spritesheets, tileset e fonte pixel entram aqui
+    this.load.spritesheet(ATLAS.key, ATLAS.url, { frameWidth: ATLAS.frame, frameHeight: ATLAS.frame });
   }
 
   create(): void {

@@ -11,17 +11,29 @@ import {
 } from '../core/meta/metaProgress';
 import { randomSeed } from '../core/rng';
 import type { RunState } from '../core/run';
-import { COLORS, GAME_HEIGHT, GAME_WIDTH, SCENE_KEYS, TEXT_COLORS } from '../config/display';
+import { COLORS, GAME_HEIGHT, GAME_WIDTH, SCENE_KEYS, TEXT_COLORS, TILE_SIZE } from '../config/display';
 import { InputController } from '../input/InputController';
 import { closeRun, loadMeta, saveMeta } from '../storage/metaStorage';
 import { clearRun, loadRun } from '../storage/runStorage';
 import { textStyle } from '../view/hud/ui';
+import { ATLAS, ENTITY_FRAMES, SPRITE_SCALE, TILE_FRAMES } from '../config/sprites';
+import { playSfx, toggleMute } from '../view/audio/sfx';
 import { bindRenderScale, getRenderScale, layoutCamera } from '../view/scaling';
 import type { GameSceneData } from './GameScene';
 
 type MenuId = 'continue' | 'new' | BuildingId | 'bestiary';
 
-const MENU_X = 90;
+const MENU_X = 96;
+
+/** Ícone de cada entrada do menu (atlas do Marco 6b). */
+const MENU_ICONS: Record<MenuId, number> = {
+  continue: ENTITY_FRAMES['Knight'] ?? 97,
+  new: TILE_FRAMES.stairs,
+  vault: 91,
+  armory: 118,
+  tome: 63,
+  bestiary: ENTITY_FRAMES['Skeleton'] ?? 121,
+};
 const MENU_Y = 150;
 const ROW_H = 34;
 const PANEL_X = 400;
@@ -54,6 +66,7 @@ export class HubScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.BACKGROUND);
+    this.drawBackdrop();
     this.meta = loadMeta();
     this.suspended = loadRun();
     this.menu = [
@@ -81,9 +94,35 @@ export class HubScene extends Phaser.Scene {
     this.controls.update(time);
   }
 
+  /**
+   * Fundo do Sanctum: a cripta bem escura (chão do Tiny Dungeon) com uma
+   * fileira de parede no topo. Fica atrás de tudo e não muda com o input.
+   */
+  private drawBackdrop(): void {
+    const t = TILE_SIZE;
+    for (let y = 0; y < Math.ceil(GAME_HEIGHT / t); y++) {
+      for (let x = 0; x < Math.ceil(GAME_WIDTH / t); x++) {
+        const frame = y < 1 ? TILE_FRAMES.wallFace : TILE_FRAMES.floor[(x * 7 + y * 13) % TILE_FRAMES.floor.length];
+        this.add
+          .image(x * t, y * t, ATLAS.key, frame)
+          .setOrigin(0)
+          .setScale(SPRITE_SCALE)
+          .setTint(y < 1 ? 0x5a5250 : 0x3c342e)
+          .setDepth(-10);
+      }
+    }
+  }
+
   // ------------------------------------------------------------------- input
 
   private handleAction(action: Action): void {
+    if (action.type === 'mute') {
+      this.message = { text: toggleMute() ? 'Som desligado (M / Select)' : 'Som ligado', color: TEXT_COLORS.MUTED };
+      this.render();
+      return;
+    }
+    if (action.type === 'move') playSfx('uiMove');
+    else if (action.type === 'confirm') playSfx('uiConfirm');
     if (this.mode === 'confirm') this.handleConfirm(action);
     else if (this.mode === 'building') this.handleBuilding(action);
     else this.handleMenu(action);
@@ -161,9 +200,11 @@ export class HubScene extends Phaser.Scene {
     const def = UPGRADES[id];
     const done = buyUpgrade(this.meta, id);
     if (done === true) {
+      playSfx('buy');
       saveMeta(this.meta);
       this.message = { text: `${def.name} nível ${upgradeLevel(this.meta, id)}!`, color: TEXT_COLORS.ACCENT };
     } else {
+      playSfx('uiDeny');
       this.message = { text: done === 'maxed' ? `${def.name} já está no máximo` : 'Gold insuficiente', color: BAD };
     }
   }
@@ -198,8 +239,15 @@ export class HubScene extends Phaser.Scene {
       const sel = i === this.selected;
       const active = sel && this.mode === 'menu';
       const label = this.menuLabel(id);
-      text(MENU_X - 22, MENU_Y + i * ROW_H, sel ? '▶' : ' ', 16, active ? TEXT_COLORS.ACCENT : TEXT_COLORS.MUTED);
-      text(MENU_X, MENU_Y + i * ROW_H, label, 16, sel ? TEXT_COLORS.ACCENT : TEXT_COLORS.PRIMARY);
+      const y = MENU_Y + i * ROW_H;
+      text(MENU_X - 34, y, sel ? '▶' : ' ', 16, active ? TEXT_COLORS.ACCENT : TEXT_COLORS.MUTED);
+      items.push(
+        this.add
+          .image(MENU_X - 2, y + 11, ATLAS.key, MENU_ICONS[id])
+          .setScale(1.5)
+          .setTint(sel ? 0xffffff : 0x9a948c),
+      );
+      text(MENU_X + 18, y, label, 16, sel ? TEXT_COLORS.ACCENT : TEXT_COLORS.PRIMARY);
     });
 
     items.push(

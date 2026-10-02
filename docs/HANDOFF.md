@@ -1,6 +1,6 @@
 # 🗡️ CRYPTVEIL — Handoff v2
 
-Atualizado em 02/10/2026 (Marco 6a). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
+Atualizado em 02/10/2026 (Marco 6b). **Substitui o handoff v1.** Este documento é a **fonte única** do design do jogo.
 
 ---
 
@@ -84,7 +84,7 @@ Histórico: o v1 era `max(1, ATK − DEF)` (não dava a faixa "18–30" do boss)
 | Testes | **Vitest 5.x**, só no `src/core/` |
 | Persistência | LocalStorage, com campo `version` no save e migração |
 | Mapas | BSP próprio em TS |
-| Assets | Kenney.nl (CC0) no Marco 6. Muitos packs são 16px: desenhar a 2× dentro do tile de 32 é ok. |
+| Assets | **Kenney Tiny Dungeon + Tiny Town (CC0, 16 px, desenhados a 2× no tile de 32)** e sprites próprios no mesmo estilo, num atlas único (Marco 6b; ver §5). Fonte **VT323** (OFL, via `@fontsource/vt323`, empacotada: roda offline). Efeitos sonoros sintetizados na Web Audio API, sem arquivos. |
 | Backend | Nenhum. Build estático (`base: './'`), roda em qualquer hospedagem ou num mini PC de fliperama. |
 
 O pacote do Phaser 4 traz skills de IA em `node_modules/phaser/skills/` (uma por subsistema + guia de migração v3→v4). Consultar antes de usar uma API do Phaser que não esteja no código ainda — muito tutorial da internet é v3.
@@ -122,6 +122,7 @@ O core recebe `Action` (`src/core/actions.ts`), nunca tecla. `InputController` t
 | Confirmar (no fim da run: vai pro resumo) | Enter | A |
 | Rerrolar a escolha de carta (Tome "Releitura", Marco 5) | Espaço | X |
 | Cancelar | Esc | B |
+| Som liga/desliga (Marco 6b) | M | Select / Back |
 
 Repetição de movimento: 130 ms (constantes no `InputController`). Com um ombro segurado, os botões de face viram hotbar e não fazem a ação normal. A hotbar e a linha de ajuda mostram a tecla ou o combo conforme o **último input usado**. **Toque na tela fica pós-MVP.**
 
@@ -176,10 +177,11 @@ cryptveil/
     │   ├── items/             # Item (canEquip), Inventory (auto-equip, equipar/desequipar), LootTable
     │   ├── meta/metaProgress.ts # MetaProgress (save versionado), compra de upgrade, conversão do gold, bônus da run, resumo (Marco 5)
     │   └── data/              # entities, items (+ materiais), lootTables, skills (níveis + hotbar), cards, relics, shop, sanctum (prédios, upgrades, bestiário)
+    ├── config/sprites.ts       # Frame do atlas de cada entidade, tile e item; tints (Marco 6b)
     ├── input/InputController.ts
-    ├── storage/               # runStorage (run suspensa) e metaStorage (meta) no LocalStorage, com try/catch
+    ├── storage/               # runStorage (run suspensa), metaStorage (meta) e settingsStorage (mudo) no LocalStorage, com try/catch
     ├── scenes/                # BootScene, HubScene (Sanctum), GameScene (mundo), UIScene (HUD), GameOverScene
-    └── view/                  # coords (tile↔pixel), scaling, events, format (LOG), EntityView
+    └── view/                  # coords (tile↔pixel), scaling, events, format (LOG), EntityView (sprite + tween), audio/sfx (Web Audio)
         └── hud/               # model (RunState → dados do HUD), StatusPanel, Hotbar, BattleLog, MiniMap, InventoryScreen, ChoiceScreen
 ```
 
@@ -323,8 +325,21 @@ Ajustes (todos medidos na simulação, 200 seeds; ruído de ±3 pontos entre rod
 
 - **Efeito colateral:** como o bot morre mais cedo, a renda de gold caiu (~78g por run sem meta). O Sanctum (2.490g) fica ainda mais longo de completar; o Felipe decidiu manter os preços por ora (3C).
 
-#### Marco 6b — Polish
-Tween de movimento (100 ms), screenshake leve, sprites Kenney, fonte pixel, capricho visual no Sanctum (já é a tela inicial), áudio.
+#### ✅ Marco 6b — Polish (entregue em 02/10/2026)
+Só view: o core, o save e a simulação não mudaram. 277 testes.
+- **Sprites:** o Felipe queria os do **Tibia**. Não dá: são da CipSoft, e o repositório e o site são públicos (qualquer sprite que entra lá fica acessível, divulgando ou não). Fica em aberto o **pacote de sprites local** (pasta fora do repositório no PC do fliperama), se ele quiser usar sprites próprios só em casa (§7). Opções vistas e recusadas: Dungeon Crawl (CC0, 32 px), Stendhal (CC-BY-SA, 48×64, estilo MMO), Shattered Pixel Dungeon (GPL, 16 px). Escolhido o estilo **Kenney Tiny Dungeon** (CC0, 16 px a 2×), porque é simples o bastante pra **estender** com sprites próprios quando vierem classes, armas e monstros novos.
+  - Atlas único `public/assets/sprites/atlas.png`, montado por `tools/sprites/build_atlas.py` (Pillow) a partir de `tools/sprites/src/` (os PNGs da Kenney e as licenças). Frames: Tiny Dungeon 0–131, Tiny Town 132–263, **próprios 264+**. Mapeamento em `src/config/sprites.ts` (entidade pelo nome; monstro sem sprite cai no fantasma).
+  - **Desenhados no estilo do pack (frames 264–266):** Skeleton (do zero), **Orc** (o ciclope 109 do pack, com pele verde, dois olhos e presas) e **Orc Warlord** (Orc mais escuro, chifres, olhos vermelhos e armadura vermelha; desenhado 1,25× maior). O Goblin é o 112, o Rat o 124, o Knight o 97.
+  - Os outros "Tiny" da Kenney foram olhados: Tiny Battle é militar moderno (nada serve), Tiny Farm é fazenda; o **Tiny Town** entra no atlas por arco/flecha, chave, bomba, paredes e portas extras (pras classes e andares futuros).
+  - **Escurecer "mas não muito"** (decisão do Felipe): tint multiplicativo por camada (`SPRITE_TINTS`): chão mais escuro, paredes, objetos e entidades quase normais.
+  - **Mapa:** chão com variações (estáveis por posição); parede com chão logo abaixo = face de tijolo; o resto da parede que encosta em chão = topo escuro com borda de pedra desenhada em código (sem autotile). Escada, altar da Training Room e mercador (baú) por cima do chão.
+  - Paper doll com ícone do item quando o atlas tem (espadas, escudos); o resto continua com sigla. Sprite vira pro lado em que anda ou ataca; flash branco ao apanhar e verde ao curar (tint FILL do Phaser 4); boss enfurecido avermelhado.
+- **Movimento animado:** 100 ms por passo (`MOVE_TWEEN_MS`, menor que a repetição de 130 ms do input). A câmera segue a view do Knight a cada frame. O core já está no tile novo: a animação é só apresentação.
+- **Screenshake:** golpe pesado no Knight (já existia), fúria do boss, morte do Knight e do boss.
+- **Fonte pixel em tudo** (decisão do Felipe): **VT323**, escolhida entre 6 (Pixelify Sans, Silkscreen, Press Start 2P, Tiny5, Jersey 10) por ser a mais legível em texto miúdo (LOG, cartas) e ter acentos. `FONT_SCALE = 1,4` converte os tamanhos do layout antigo. `letterSpacing` 0,5 faz o Phaser desenhar letra por letra, o que desliga a ligadura "fi" da fonte (sem isso "Afiar" aparecia "Añar"). O jogo espera a fonte carregar antes de criar o primeiro texto.
+- **Som:** só efeitos (música o Felipe arruma depois), **sintetizados na Web Audio API**: golpe, crítico, dano, kill, morte, arremesso, cura, level up, loot, venda, compra, escada, fúria, invocação, vitória e UI (mover, confirmar, negar). **M / Select = mudo**, salvo em `cryptveil.settings` (fora da meta). O Felipe ainda não comprou o bartop; o Select deve existir.
+- **Sanctum:** fundo de cripta (tiles bem escuros) e um ícone por entrada do menu.
+- **Rede do ambiente** (02/10/2026): o Felipe pôs o acesso em "Completo" pra liberar o `kenney.nl`. Recomendação registrada: voltar pra "Personalizado" só com os domínios necessários (`kenney.nl`); quando precisar de outro, o Claude explica o que é e por quê antes de pedir.
 
 **Pós-MVP (v1.1+):** Sorcerer/Paladin/Druid, Floors 6–15, Dragon/Demon/Lich/Vampire, bosses 10/15, Bestiary progressivo, conquistas, toque na tela, modo fliperama (atração, ranking de 3 iniciais).
 
@@ -359,7 +374,10 @@ Tween de movimento (100 ms), screenshake leve, sprites Kenney, fonte pixel, capr
 - [x] Empilhamento de DEF (§2.12): resolvido no Marco 6a com a redução percentual.
 - [x] **Dificuldade (feedback do Felipe jogando o Marco 4): "pouca dificuldade pra vencer".** Endurecida no Marco 6a (bot sem meta de 41% pra ~14%). Falta o Felipe confirmar jogando.
 - [ ] Relíquias por run baixas na simulação (0,3): revisar preços/renda de gold no Marco 6.
-- [ ] Custo total do Sanctum (2.490g) vs. renda de gold por run: provavelmente runs demais pra completar. Revisar no Marco 6.
+- [ ] Custo total do Sanctum (2.490g) vs. renda de gold por run: provavelmente runs demais pra completar. O Felipe manteve os preços no 6a; revisar quando ele jogar mais.
+- [ ] **Sprites que faltam** (desenhar no estilo do Tiny Dungeon quando precisar): ícones de armadura, elmo, perneira, botas, anel, amuleto e relíquias no paper doll (hoje sigla); ícones das skills na hotbar; monstros pós-MVP (Dragon, Lich, Vampire, Demon). O Ghost do §2.9 já tem sprite no pack (121).
+- [ ] **Pacote de sprites local** (opcional, só no fliperama): carregar uma pasta fora do repositório no lugar do atlas, se o Felipe quiser sprites próprios em casa.
+- [ ] Música (o Felipe arruma uma); quando vier, entra com volume próprio e o mesmo mudo.
 
 ---
 

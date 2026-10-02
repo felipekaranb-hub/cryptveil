@@ -5,8 +5,8 @@ Roguelite por turnos inspirado em Tibia. TypeScript 6 + Phaser 4 + Vite 8 + Vite
 
 ## Onde estamos (atualizado em 02/10/2026)
 
-- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário) e 6a (balanceamento: DEF em porcentagem, bot sem meta ~14%). Tudo publicado na `main`.
-- **Próximo:** Marco 6b — polish (tween de movimento, screenshake, sprites Kenney, fonte pixel, visual do Sanctum, áudio). Apresentar o plano antes.
+- **Entregues:** Marcos 0, 1, 2a–2d (andares, Knight, cartas), 3 (UI completa: HUD, hotbar com combo LB/RB, inventário, minimapa, fog of war), 4 (monstros reais com arremesso de longe, mercador e loja, Orc Warlord, 4 relíquias) 5 (Sanctum com The Vault, Ancient Armory e Tome of Knowledge, resumo do fim da run, MetaProgress versionado, bestiário) 6a (balanceamento: DEF em porcentagem, bot sem meta ~14%) e 6b (sprites Kenney Tiny Dungeon + próprios, movimento animado, fonte VT323, sons sintetizados, mudo). Tudo publicado na `main`. **O MVP está completo.**
+- **Próximo:** o Felipe joga e valida. Depois, pós-MVP (§5 do handoff: classes, andares 6–15, monstros novos, música). Apresentar o plano antes.
 - O que já foi decidido (e por quê) está no `docs/HANDOFF.md` §5 (um bloco por Marco) e §7. Números provisórios: balanceamento final no Marco 6.
 
 ## Vocabulário (não confundir)
@@ -42,6 +42,8 @@ SIM=100 npx vitest run src/core/sim --silent=false   # simulação headless de b
 - **Testar o controle sem controle:** no `addInitScript`, troque `navigator.getGamepads` por um pad falso (`mapping: 'standard'`, botões 0–3 = A/B/X/Y, 4/5 = LB/RB) e dispare `gamepadconnected`. O `timestamp` do pad tem que ser **maior** que o `performance.now()` da criação, senão o Phaser ignora os botões.
 - **Andar do boss (5):** não existe escada até o Orc Warlord morrer (`state.hiddenStairs` marca o andar; a escada nasce onde ele cai). Helper de teste ou bot que "anda até a escada" tem que mirar no boss enquanto ele vive, e escolher a carta do level up que o kill dele abre.
 - **Bot de teste no navegador "travado" quase sempre é o bot**, não o jogo: monstro parado num corredor de 1 tile bloqueia o caminho "livre", ou um prompt (carta/loja) ficou aberto. Antes de caçar bug, leia `state.status`, `state.prompt` e `scene.mode`.
+- **Sprites:** atlas único em `public/assets/sprites/atlas.png`, montado por `python3 tools/sprites/build_atlas.py` (precisa de Pillow: `pip install pillow`). Sprite novo = desenhar no script (16 px, paleta do Tiny Dungeon), rodar e mapear em `src/config/sprites.ts`. Não colocar sprites do Tibia nem de outro jogo com direitos no repositório (é público).
+- Script de Playwright rodado com `node` a partir da pasta do projeto salva screenshot com caminho relativo **dentro do repositório**: use `__dirname` + scratchpad.
 - Debug no navegador (só no dev): `window.__game.scene.getScene('game').state` é o `RunState` vivo; módulos do core dá pra importar com `await import('/src/core/...ts')`.
 
 ## Regras de arquitetura (verificadas por teste)

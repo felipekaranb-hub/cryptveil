@@ -28,6 +28,8 @@ export type Action =
   | { readonly type: 'sell'; readonly itemId: ItemId; readonly count?: number }
   /** Trocar de página/aba (Q/E, LB/RB). Só a view usa; o core ignora. */
   | { readonly type: 'page'; readonly delta: -1 | 1 }
+  /** Liga/desliga o som (M, Select). Só a view usa; o core ignora. */
+  | { readonly type: 'mute' }
   | { readonly type: 'confirm' }
   | { readonly type: 'cancel' };
 
@@ -57,6 +59,8 @@ export function describeAction(a: Action): string {
       return `sell ${a.itemId}${a.count ? ` ×${a.count}` : ''}`;
     case 'page':
       return `page ${a.delta}`;
+    case 'mute':
+      return 'mute';
     case 'confirm':
       return 'confirm';
     case 'cancel':
